@@ -9,7 +9,7 @@ services:
       MYSQL_PASSWORD: school_pass
       MYSQL_ROOT_PASSWORD: root_pass
     ports:
-      - "3306:3306"
+      - "3317:3306"
     volumes:
       - mysql_data:/var/lib/mysql
       - ./school-backend/school_db.sql:/docker-entrypoint-initdb.d/01-school.sql:ro
