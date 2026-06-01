@@ -1,17 +1,18 @@
 import { useState } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { FiLogIn } from 'react-icons/fi'
+import { homeForRole } from '../auth/roles'
 import { useAuth } from '../context/AuthContext'
 
 export default function Login() {
-  const { login, isAuthenticated } = useAuth()
+  const { login, isAuthenticated, user } = useAuth()
   const navigate = useNavigate()
   const [form, setForm] = useState({ email: 'admin@school.test', password: 'password' })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
   if (isAuthenticated) {
-    return <Navigate to="/" replace />
+    return <Navigate to={homeForRole(user?.role)} replace />
   }
 
   async function submit(event) {
@@ -19,10 +20,10 @@ export default function Login() {
     setLoading(true)
     setError('')
     try {
-      await login(form)
-      navigate('/')
+      const loggedInUser = await login(form)
+      navigate(homeForRole(loggedInUser.role), { replace: true })
     } catch (err) {
-      setError(err.response?.data?.message || 'Login failed')
+      setError(err.response?.data?.message || err.message || 'Login failed')
     } finally {
       setLoading(false)
     }

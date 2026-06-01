@@ -19,6 +19,7 @@ api.interceptors.response.use(
     if (error.response?.status === 401) {
       localStorage.removeItem('school_token')
       localStorage.removeItem('school_user')
+      window.dispatchEvent(new Event('school:unauthorized'))
     }
     return Promise.reject(error)
   },

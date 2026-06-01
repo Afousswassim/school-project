@@ -56,21 +56,24 @@ $resources = [
     'payments' => Payment::class,
 ];
 
+$resourceRoles = [
+    'students' => ['read' => ['admin'], 'write' => ['admin']],
+    'teachers' => ['read' => ['admin'], 'write' => ['admin']],
+    'subjects' => ['read' => ['admin'], 'write' => ['admin']],
+    'classes' => ['read' => ['admin', 'teacher'], 'write' => ['admin']],
+    'grades' => ['read' => ['admin', 'teacher', 'student'], 'write' => ['admin', 'teacher']],
+    'attendance' => ['read' => ['admin', 'teacher', 'student'], 'write' => ['admin', 'teacher']],
+    'absences' => ['read' => ['admin', 'teacher', 'student'], 'write' => ['admin', 'teacher']],
+    'payments' => ['read' => ['admin'], 'write' => ['admin']],
+];
+
 $resource = $segments[0] ?? '';
 if (!isset($resources[$resource])) {
     Response::json(false, 'Route not found', null, 404);
 }
 
-$writeRoles = ['admin'];
-if (in_array($resource, ['grades', 'attendance', 'absences'], true)) {
-    $writeRoles = ['admin', 'teacher'];
-}
-
-if (in_array($method, ['POST', 'PUT', 'PATCH', 'DELETE'], true)) {
-    AuthMiddleware::requireRoles($writeRoles);
-} else {
-    AuthMiddleware::user();
-}
+$permission = in_array($method, ['POST', 'PUT', 'PATCH', 'DELETE'], true) ? 'write' : 'read';
+AuthMiddleware::requireRoles($resourceRoles[$resource][$permission] ?? ['admin']);
 
 $controller = new ResourceController(new $resources[$resource]());
 $id = isset($segments[1]) ? (int) $segments[1] : null;

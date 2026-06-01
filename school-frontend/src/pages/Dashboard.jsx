@@ -1,22 +1,42 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import StatCard from '../components/StatCard'
 import { resourceService } from '../services/resourceService'
 import { useAuth } from '../context/AuthContext'
 
+const roleStats = {
+  admin: [
+    ['students', 'Students', 'primary'],
+    ['teachers', 'Teachers', 'success'],
+    ['subjects', 'Subjects', 'warning'],
+    ['payments', 'Payments', 'info'],
+  ],
+  teacher: [
+    ['classes', 'My Classes', 'primary'],
+    ['grades', 'Grades', 'success'],
+    ['attendance', 'Attendance', 'warning'],
+  ],
+  student: [
+    ['grades', 'My Grades', 'primary'],
+    ['attendance', 'My Attendance', 'success'],
+  ],
+}
+
 export default function Dashboard() {
   const { user } = useAuth()
-  const [stats, setStats] = useState({ students: 0, teachers: 0, subjects: 0, payments: 0 })
+  const statResources = useMemo(() => roleStats[user?.role] || [], [user?.role])
+  const [stats, setStats] = useState({})
 
   useEffect(() => {
-    Promise.all(['students', 'teachers', 'subjects', 'payments'].map((resource) => resourceService.list(resource, { limit: 1 })))
-      .then(([students, teachers, subjects, payments]) => setStats({
-        students: students.total,
-        teachers: teachers.total,
-        subjects: subjects.total,
-        payments: payments.total,
-      }))
+    Promise.all(statResources.map(([resource]) => resourceService.list(resource, { limit: 1 })))
+      .then((results) => {
+        const nextStats = {}
+        statResources.forEach(([resource], index) => {
+          nextStats[resource] = results[index].total
+        })
+        setStats(nextStats)
+      })
       .catch(() => {})
-  }, [])
+  }, [statResources])
 
   return (
     <section className="content-section">
@@ -27,14 +47,13 @@ export default function Dashboard() {
         </div>
       </div>
       <div className="stats-grid">
-        <StatCard label="Students" value={stats.students} tone="primary" />
-        <StatCard label="Teachers" value={stats.teachers} tone="success" />
-        <StatCard label="Subjects" value={stats.subjects} tone="warning" />
-        <StatCard label="Payments" value={stats.payments} tone="info" />
+        {statResources.map(([resource, label, tone]) => (
+          <StatCard key={resource} label={label} value={stats[resource] ?? 0} tone={tone} />
+        ))}
       </div>
       <div className="data-surface mt-4 p-4">
         <h3 className="h5">Today</h3>
-        <p className="text-muted mb-0">Use the navigation to manage records. Teachers can manage grades and attendance; admins can manage the full school setup.</p>
+        <p className="text-muted mb-0">Use the navigation to open the records available for your role.</p>
       </div>
     </section>
   )

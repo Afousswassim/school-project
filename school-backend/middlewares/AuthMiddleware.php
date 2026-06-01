@@ -8,8 +8,8 @@ final class AuthMiddleware
 {
     public static function user(): array
     {
-        $header = $_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '';
-        if (!preg_match('/Bearer\s+(.+)/', $header, $matches)) {
+        $header = self::authorizationHeader();
+        if (!preg_match('/^Bearer\s+(.+)$/i', trim($header), $matches)) {
             Response::json(false, 'Authentication token missing', null, 401);
         }
 
@@ -29,5 +29,27 @@ final class AuthMiddleware
         }
 
         return $user;
+    }
+
+    private static function authorizationHeader(): string
+    {
+        if (!empty($_SERVER['HTTP_AUTHORIZATION'])) {
+            return (string) $_SERVER['HTTP_AUTHORIZATION'];
+        }
+
+        if (!empty($_SERVER['REDIRECT_HTTP_AUTHORIZATION'])) {
+            return (string) $_SERVER['REDIRECT_HTTP_AUTHORIZATION'];
+        }
+
+        if (function_exists('apache_request_headers')) {
+            $headers = apache_request_headers();
+            foreach ($headers as $name => $value) {
+                if (strtolower((string) $name) === 'authorization') {
+                    return (string) $value;
+                }
+            }
+        }
+
+        return '';
     }
 }

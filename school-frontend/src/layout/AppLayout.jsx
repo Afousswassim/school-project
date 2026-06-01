@@ -1,29 +1,20 @@
 import { NavLink, Outlet } from 'react-router-dom'
-import { FiBookOpen, FiCreditCard, FiGrid, FiLogOut, FiMoon, FiSun, FiUsers } from 'react-icons/fi'
+import { FiLogOut, FiMoon, FiSun } from 'react-icons/fi'
+import { NAV_ITEMS } from '../auth/roles'
 import { useAuth } from '../context/AuthContext'
 import { useTheme } from '../context/ThemeContext'
-
-const navItems = [
-  ['/', 'Dashboard', FiGrid],
-  ['/students', 'Students', FiUsers],
-  ['/teachers', 'Teachers', FiUsers],
-  ['/subjects', 'Subjects', FiBookOpen],
-  ['/classes', 'Classes', FiGrid],
-  ['/grades', 'Grades', FiBookOpen],
-  ['/attendance', 'Attendance', FiGrid],
-  ['/payments', 'Payments', FiCreditCard],
-]
 
 export default function AppLayout() {
   const { user, logout } = useAuth()
   const { darkMode, toggleTheme } = useTheme()
+  const navItems = NAV_ITEMS.filter((item) => item.roles.includes(user?.role))
 
   return (
     <div className="app-shell">
       <aside className="sidebar">
         <div className="brand">SchoolPro</div>
         <nav className="nav flex-column gap-1">
-          {navItems.map(([to, label, Icon]) => (
+          {navItems.map(({ to, label, icon: Icon }) => (
             <NavLink key={to} to={to} end={to === '/'} className="nav-link">
               <Icon aria-hidden="true" />
               <span>{label}</span>
