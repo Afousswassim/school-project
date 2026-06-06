@@ -32,6 +32,7 @@ export const NAV_ITEMS = [
   { to: '/my-classes', label: 'My Classes', icon: FiUsers, roles: [ROLES.teacher], resource: 'classes' },
   { to: '/grades', label: 'Grades', icon: FiBookOpen, roles: [ROLES.teacher], resource: 'grades' },
   { to: '/attendance', label: 'Attendance', icon: FiGrid, roles: [ROLES.teacher], resource: 'attendance' },
+  { to: '/profile', label: 'Profile', icon: FiUser, roles: [ROLES.teacher] },
   { to: '/student', label: 'Dashboard', icon: FiGrid, roles: [ROLES.student] },
   { to: '/my-grades', label: 'My Grades', icon: FiBookOpen, roles: [ROLES.student], resource: 'grades' },
   { to: '/my-attendance', label: 'My Attendance', icon: FiGrid, roles: [ROLES.student], resource: 'attendance' },

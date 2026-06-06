@@ -4,7 +4,7 @@ declare(strict_types=1);
 final class User extends BaseModel
 {
     protected string $table = 'users';
-    protected array $fillable = ['role_id', 'name', 'email', 'password', 'status'];
+    protected array $fillable = ['role_id', 'name', 'email', 'password', 'status', 'profile_photo'];
     protected array $searchable = ['name', 'email', 'status'];
 
     public function findByEmail(string $email): ?array

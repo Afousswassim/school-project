@@ -5,11 +5,15 @@ import { homeForRole } from '../auth/roles'
 import { useAuth } from '../context/AuthContext'
 
 export default function Login() {
-  const { login, isAuthenticated, user } = useAuth()
+  const { login, authChecking, isAuthenticated, user } = useAuth()
   const navigate = useNavigate()
   const [form, setForm] = useState({ email: 'admin@school.test', password: 'password' })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+
+  if (authChecking) {
+    return null
+  }
 
   if (isAuthenticated) {
     return <Navigate to={homeForRole(user?.role)} replace />

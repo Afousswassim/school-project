@@ -1,5 +1,5 @@
 /* eslint-disable react-refresh/only-export-components */
-import { createContext, useContext, useEffect, useMemo, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { authService } from '../services/authService'
 
 const AuthContext = createContext(null)
@@ -8,17 +8,17 @@ const USER_KEY = 'school_user'
 
 export function AuthProvider({ children }) {
   const [token, setToken] = useState(() => localStorage.getItem(TOKEN_KEY))
-  const [user, setUser] = useState(() => {
-    const saved = localStorage.getItem(USER_KEY)
-    try {
-      return saved ? JSON.parse(saved) : null
-    } catch {
-      localStorage.removeItem(USER_KEY)
-      return null
-    }
-  })
+  const [user, setUser] = useState(null)
+  const [authChecking, setAuthChecking] = useState(() => Boolean(localStorage.getItem(TOKEN_KEY)))
 
-  async function login(credentials) {
+  const clearSession = useCallback(() => {
+    localStorage.removeItem(TOKEN_KEY)
+    localStorage.removeItem(USER_KEY)
+    setToken(null)
+    setUser(null)
+  }, [])
+
+  const login = useCallback(async (credentials) => {
     const session = await authService.login(credentials)
     if (!session?.token || !session?.user?.role) {
       throw new Error('Login response did not include a valid token and role')
@@ -27,27 +27,76 @@ export function AuthProvider({ children }) {
     localStorage.setItem(USER_KEY, JSON.stringify(session.user))
     setToken(session.token)
     setUser(session.user)
+    setAuthChecking(false)
     return session.user
-  }
+  }, [])
 
-  function logout() {
-    localStorage.removeItem(TOKEN_KEY)
-    localStorage.removeItem(USER_KEY)
-    setToken(null)
-    setUser(null)
-  }
+  const logout = useCallback(() => {
+    clearSession()
+    setAuthChecking(false)
+  }, [clearSession])
+
+  const updateUser = useCallback((updates) => {
+    setUser((current) => {
+      if (!current) return current
+      const nextUser = { ...current, ...updates }
+      localStorage.setItem(USER_KEY, JSON.stringify(nextUser))
+      return nextUser
+    })
+  }, [])
 
   useEffect(() => {
     function handleUnauthorized() {
-      setToken(null)
-      setUser(null)
+      clearSession()
+      setAuthChecking(false)
     }
 
     window.addEventListener('school:unauthorized', handleUnauthorized)
     return () => window.removeEventListener('school:unauthorized', handleUnauthorized)
-  }, [])
+  }, [clearSession])
 
-  const value = useMemo(() => ({ token, user, login, logout, isAuthenticated: Boolean(token && user) }), [token, user])
+  useEffect(() => {
+    let active = true
+    const savedToken = localStorage.getItem(TOKEN_KEY)
+
+    if (!savedToken) {
+      localStorage.removeItem(USER_KEY)
+      return () => {
+        active = false
+      }
+    }
+
+    authService.me()
+      .then((verifiedUser) => {
+        if (!active) return
+        if (!verifiedUser?.role) {
+          clearSession()
+          return
+        }
+        localStorage.setItem(USER_KEY, JSON.stringify(verifiedUser))
+        setToken(savedToken)
+        setUser(verifiedUser)
+      })
+      .catch(() => {
+        if (active) {
+          clearSession()
+        }
+      })
+      .finally(() => {
+        if (active) {
+          setAuthChecking(false)
+        }
+      })
+
+    return () => {
+      active = false
+    }
+  }, [clearSession])
+
+  const value = useMemo(
+    () => ({ token, user, login, logout, updateUser, authChecking, isAuthenticated: Boolean(token && user && !authChecking) }),
+    [token, user, login, logout, updateUser, authChecking],
+  )
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 

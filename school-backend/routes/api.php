@@ -22,8 +22,10 @@ require_once __DIR__ . '/../models/ClassModel.php';
 require_once __DIR__ . '/../models/Grade.php';
 require_once __DIR__ . '/../models/Absence.php';
 require_once __DIR__ . '/../models/Payment.php';
+require_once __DIR__ . '/../models/Profile.php';
 require_once __DIR__ . '/../controllers/AuthController.php';
 require_once __DIR__ . '/../controllers/ResourceController.php';
+require_once __DIR__ . '/../controllers/ProfileController.php';
 
 set_exception_handler(fn (Throwable $e) => Response::json(false, getenv('APP_ENV') === 'production' ? 'Server error' : $e->getMessage(), null, 500));
 
@@ -41,6 +43,21 @@ if (($segments[0] ?? '') === 'auth') {
         'login' => $method === 'POST' ? $auth->login($body) : Response::json(false, 'Method not allowed', null, 405),
         'register' => $method === 'POST' ? $auth->register($body) : Response::json(false, 'Method not allowed', null, 405),
         'me' => $method === 'GET' ? $auth->me(AuthMiddleware::user()) : Response::json(false, 'Method not allowed', null, 405),
+        default => Response::json(false, 'Route not found', null, 404),
+    };
+}
+
+if (($segments[0] ?? '') === 'profile') {
+    $authUser = AuthMiddleware::requireRoles(['admin', 'teacher', 'student']);
+    $profile = new ProfileController();
+
+    match ([$method, $segments[1] ?? '']) {
+        ['GET', ''] => $profile->show($authUser),
+        ['PUT', ''] => $profile->update($authUser, $body),
+        ['PATCH', ''] => $profile->update($authUser, $body),
+        ['POST', 'photo'] => $profile->uploadPhoto($authUser),
+        ['PUT', 'password'] => $profile->updatePassword($authUser, $body),
+        ['PATCH', 'password'] => $profile->updatePassword($authUser, $body),
         default => Response::json(false, 'Route not found', null, 404),
     };
 }
