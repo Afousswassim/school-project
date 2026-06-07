@@ -7,6 +7,7 @@ import Dashboard from './pages/Dashboard.jsx'
 import ResourcePage from './pages/ResourcePage.jsx'
 import SimplePage from './pages/SimplePage.jsx'
 import ProfilePage from './pages/ProfilePage.jsx'
+import SettingsPage from './pages/SettingsPage.jsx'
 import './App.css'
 
 function App() {
@@ -22,8 +23,7 @@ function App() {
               <Route path="/teachers" element={<ResourcePage resource="teachers" />} />
               <Route path="/subjects" element={<ResourcePage resource="subjects" />} />
               <Route path="/payments" element={<ResourcePage resource="payments" />} />
-              <Route path="/reports" element={<SimplePage title="Reports" eyebrow="Admin">Reports are restricted to administrators.</SimplePage>} />
-              <Route path="/settings" element={<SimplePage title="Settings" eyebrow="Admin">Settings are restricted to administrators.</SimplePage>} />
+              <Route path="/settings" element={<SettingsPage />} />
             </Route>
             <Route element={<RoleProtectedRoute roles={['teacher', 'student']} />}>
               <Route path="/profile" element={<ProfilePage />} />

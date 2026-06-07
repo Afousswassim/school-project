@@ -41,7 +41,7 @@ const config = {
   },
   payments: {
     title: 'Payments',
-    columns: ['id', 'student_id', 'amount', 'due_date', 'payment_date', 'status'],
+    columns: ['id', 'student_name', 'amount', 'due_date', 'payment_date', 'status'],
     fields: [['student_id', 'Student ID', 'number', true], ['amount', 'Amount', 'number', true], ['due_date', 'Due Date', 'date', true], ['payment_date', 'Payment Date', 'date'], ['method', 'Method', 'select', false, ['cash', 'card', 'bank_transfer', 'check']], ['reference', 'Reference'], ['status', 'Status', 'select', true, ['pending', 'paid', 'overdue', 'cancelled']], ['description', 'Description']],
   },
 }

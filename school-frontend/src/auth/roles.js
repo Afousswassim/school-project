@@ -1,5 +1,4 @@
 import {
-  FiBarChart2,
   FiBookOpen,
   FiCreditCard,
   FiGrid,
@@ -26,7 +25,6 @@ export const NAV_ITEMS = [
   { to: '/teachers', label: 'Teachers', icon: FiUsers, roles: [ROLES.admin], resource: 'teachers' },
   { to: '/subjects', label: 'Subjects', icon: FiBookOpen, roles: [ROLES.admin], resource: 'subjects' },
   { to: '/payments', label: 'Payments', icon: FiCreditCard, roles: [ROLES.admin], resource: 'payments' },
-  { to: '/reports', label: 'Reports', icon: FiBarChart2, roles: [ROLES.admin] },
   { to: '/settings', label: 'Settings', icon: FiSettings, roles: [ROLES.admin] },
   { to: '/teacher', label: 'Dashboard', icon: FiGrid, roles: [ROLES.teacher] },
   { to: '/my-classes', label: 'My Classes', icon: FiUsers, roles: [ROLES.teacher], resource: 'classes' },

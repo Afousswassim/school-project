@@ -9,13 +9,42 @@ final class Setting extends BaseModel
 
     /**
      * Get the first (and usually only) settings record.
-     * Settings are typically singleton in design.
+     * If no settings exist, create default settings.
      */
     public function getSettings(): ?array
     {
         $stmt = $this->db->prepare("SELECT * FROM {$this->table} LIMIT 1");
         $stmt->execute();
-        return $stmt->fetch() ?: null;
+        $result = $stmt->fetch();
+        
+        if (!$result) {
+            // Create default settings if none exist
+            return $this->createDefaultSettings();
+        }
+        
+        return $result;
+    }
+
+    /**
+     * Create default settings record
+     */
+    private function createDefaultSettings(): ?array
+    {
+        $defaults = [
+            'school_name' => 'SchoolPro',
+            'academic_year' => '2025/2026',
+            'school_email' => 'contact@school.test',
+            'school_phone' => '+212 600000000',
+            'school_address' => 'School Address',
+        ];
+        
+        $stmt = $this->db->prepare(
+            "INSERT INTO {$this->table} (school_name, academic_year, school_email, school_phone, school_address) 
+             VALUES (:school_name, :academic_year, :school_email, :school_phone, :school_address)"
+        );
+        $stmt->execute($defaults);
+        
+        return $this->getSettings();
     }
 
     /**
