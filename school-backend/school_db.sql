@@ -161,3 +161,37 @@ ON DUPLICATE KEY UPDATE first_name = VALUES(first_name);
 INSERT INTO subjects (teacher_id, code, name, description, credits) VALUES
 (1, 'MATH10', 'Mathematics', 'Algebra and geometry fundamentals', 4)
 ON DUPLICATE KEY UPDATE name = VALUES(name);
+
+CREATE TABLE settings (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  school_name VARCHAR(255) NOT NULL DEFAULT 'School Management System',
+  academic_year VARCHAR(20) NOT NULL DEFAULT '2025-2026',
+  school_email VARCHAR(160) NOT NULL DEFAULT 'school@example.com',
+  school_phone VARCHAR(40) NOT NULL DEFAULT '+1 (555) 123-4567',
+  school_address TEXT NOT NULL DEFAULT '123 Education Street, Learning City, LC 12345',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+INSERT INTO settings (school_name, academic_year, school_email, school_phone, school_address) VALUES
+('Modern School of Excellence', '2025-2026', 'admin@school.test', '+1 (555) 123-4567', '123 Education Street, Learning City, LC 12345')
+ON DUPLICATE KEY UPDATE school_name = VALUES(school_name);
+
+INSERT INTO payments (student_id, amount, due_date, payment_date, method, status, description) VALUES
+(1, 500.00, '2025-09-15', NULL, NULL, 'pending', 'Monthly tuition fee'),
+(1, 500.00, '2025-10-15', '2025-10-10', 'cash', 'paid', 'Monthly tuition fee'),
+(1, 500.00, '2025-08-15', '2025-08-20', 'bank_transfer', 'paid', 'Monthly tuition fee')
+ON DUPLICATE KEY UPDATE amount = VALUES(amount);
+
+INSERT INTO grades (student_id, subject_id, teacher_id, exam_name, exam_date, score, max_score, term) VALUES
+(1, 1, 1, 'Midterm Exam', '2025-10-20', 85.50, 100, 'Term 1'),
+(1, 1, 1, 'Final Exam', '2025-12-15', 92.00, 100, 'Term 1')
+ON DUPLICATE KEY UPDATE score = VALUES(score);
+
+INSERT INTO attendance (student_id, class_id, subject_id, teacher_id, attendance_date, status) VALUES
+(1, 1, 1, 1, '2025-10-01', 'present'),
+(1, 1, 1, 1, '2025-10-02', 'present'),
+(1, 1, 1, 1, '2025-10-03', 'absent'),
+(1, 1, 1, 1, '2025-10-04', 'present'),
+(1, 1, 1, 1, '2025-10-05', 'late')
+ON DUPLICATE KEY UPDATE status = VALUES(status);

@@ -4,6 +4,15 @@ declare(strict_types=1);
 require_once __DIR__ . '/../services/JwtService.php';
 require_once __DIR__ . '/../includes/Response.php';
 
+/**
+ * Authorization middleware helpers.
+ *
+ * - `user()` extracts and validates the Bearer token and returns the JWT payload.
+ * - `requireRoles(array $roles)` ensures the current user has one of the allowed roles
+ *    and returns the payload; otherwise a JSON error response is sent.
+ *
+ * This centralizes token parsing and role checks for the API routes.
+ */
 final class AuthMiddleware
 {
     public static function user(): array

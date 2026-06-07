@@ -1,6 +1,16 @@
 <?php
 declare(strict_types=1);
 
+/**
+ * Simple JWT implementation used by the API for authentication.
+ *
+ * - `encode(array $payload)` returns a signed token string.
+ * - `decode(string $token)` validates signature and expiration and
+ *    returns the original payload array or null on failure.
+ *
+ * NOTE: This is a minimal implementation for learning/demo purposes.
+ * Use a well-tested library for production (e.g. firebase/php-jwt).
+ */
 final class JwtService
 {
     public static function encode(array $payload): string

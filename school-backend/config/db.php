@@ -1,6 +1,14 @@
 <?php
 declare(strict_types=1);
 
+/**
+ * Database connection helper.
+ *
+ * Provides a single shared PDO connection for the application.
+ * Use `Database::connection()` anywhere you need a DB handle.
+ * Connection settings come from environment variables and default
+ * to reasonable local-development values.
+ */
 final class Database
 {
     private static ?PDO $connection = null;
