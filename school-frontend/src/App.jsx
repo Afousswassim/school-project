@@ -25,18 +25,19 @@ function App() {
               <Route path="/reports" element={<SimplePage title="Reports" eyebrow="Admin">Reports are restricted to administrators.</SimplePage>} />
               <Route path="/settings" element={<SimplePage title="Settings" eyebrow="Admin">Settings are restricted to administrators.</SimplePage>} />
             </Route>
+            <Route element={<RoleProtectedRoute roles={['teacher', 'student']} />}>
+              <Route path="/profile" element={<ProfilePage />} />
+            </Route>
             <Route element={<RoleProtectedRoute roles={['teacher']} />}>
               <Route path="/teacher" element={<Dashboard />} />
               <Route path="/my-classes" element={<ResourcePage resource="classes" />} />
               <Route path="/grades" element={<ResourcePage resource="grades" />} />
               <Route path="/attendance" element={<ResourcePage resource="attendance" />} />
-              <Route path="/profile" element={<ProfilePage />} />
             </Route>
             <Route element={<RoleProtectedRoute roles={['student']} />}>
               <Route path="/student" element={<Dashboard />} />
               <Route path="/my-grades" element={<ResourcePage resource="grades" />} />
               <Route path="/my-attendance" element={<ResourcePage resource="attendance" />} />
-              <Route path="/profile" element={<ProfilePage />} />
             </Route>
           </Route>
         </Route>
