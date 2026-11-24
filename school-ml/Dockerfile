@@ -9,4 +9,4 @@ RUN pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cpu 
 
 COPY . .
 EXPOSE 5000
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--threads", "4", "--timeout", "180", "app:app"]
+CMD ["sh", "-ec", "if [ ! -s artifacts/gravite.joblib ] || [ ! -s artifacts/type_incident.joblib ]; then python -m ml.train; fi; exec gunicorn --bind 0.0.0.0:5000 --threads 4 --timeout 180 app:app"]

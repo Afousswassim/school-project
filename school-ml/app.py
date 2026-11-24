@@ -1,6 +1,6 @@
 from flask import Flask, jsonify, request
 
-from ml.predict import predict_gravity, predict_type
+from ml.predict import predict_gravity, predict_incident
 
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 64 * 1024
@@ -35,12 +35,14 @@ def analyze_report_ml():
 
     try:
         result = predict_gravity(text)
-    except FileNotFoundError:
-        return jsonify(error="Le modèle de gravité TF-IDF est indisponible."), 503
+    except Exception:
+        app.logger.exception("Modèle de gravité TF-IDF indisponible.")
+        return jsonify(error="L’analyse de gravité TF-IDF est momentanément indisponible."), 503
 
     try:
-        result["incident_type"] = predict_type(text)
+        result.update(predict_incident(text))
     except Exception:
-        app.logger.error("Le modèle de type d’incident n’a pas pu être utilisé.")
-        result["incident_type"] = None
+        app.logger.exception("Modèle de type d’incident TF-IDF indisponible.")
+        result.update(incident_type=None, incident_type_uncertain=True)
+    result["requires_human_review"] = result["gravity_uncertain"] or result["incident_type_uncertain"]
     return jsonify(result)

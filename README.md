@@ -87,6 +87,8 @@ $env:NODE_PATH = Join-Path $browserDeps 'node_modules'
 node tests/discipline-demo.cjs
 ```
 
+`node tests/discipline-demo.cjs holdout` vérifie en plus le rendu de 20 rapports annotés réservés au test (deux par type) et de huit cas à vérifier.
+
 Pour vérifier le rendu quand TF-IDF échoue, mettez temporairement son fichier de côté dans le volume de démo. La commande remet le modèle en place après le test.
 
 ```powershell
@@ -113,9 +115,37 @@ PHP contrôle l’affectation via `students.class_id → classes.teacher_id → 
 
 Le conteneur PHP applique la migration `school-backend/migrations/discipline-reports.php` à chaque démarrage, après l’initialisation de MySQL. Elle peut aussi être relancée avec `docker compose exec -T backend php /var/www/html/migrations/discipline-reports.php`. Les données de paiement historiques restent dans MySQL.
 
-Les fichiers d’entraînement de `school-ml` proviennent de `feature/ml-gravite` au commit `b2f22975c03ec3d5fb7f561549d5eaeb8c18f3af`. La logique BERT correspond à celle de `reference/bert-mots-cles` au commit `9281127cdf70032b8ee2aaa6e1d20fa24086a335`. Elle peut proposer « Grave » pour un rapport contenant « aucun coup », car les mots-clés priment sur le sentiment.
+Le fichier `school-ml/data/rapports_baseline.csv` conserve le corpus historique (72 rapports d’entraînement et 24 de test, annotés uniquement en gravité). La méthode historique BERT + mots-clés reste disponible dans l’application et dans la comparaison. Elle peut proposer « Grave » pour un rapport contenant « aucun coup », car les mots-clés priment sur le sentiment.
 
-Les dépendances principales sont épinglées dans `school-ml`. Le volume `bert_cache` conserve la révision BERT téléchargée lors de la préparation, puis Flask utilise ce cache hors ligne pour les analyses. Le volume `discipline_models` conserve `gravite.joblib`, entraîné sur 72 rapports fictifs. La branche Python fournit uniquement un modèle de gravité. Un pipeline de type compatible et de confiance placé dans `/app/artifacts/type.joblib` peut fournir un libellé via `predict`. En son absence, la carte affiche « Type indisponible ».
+Le corpus `school-ml/data/rapports_fictifs.csv` réunit 936 formulations d’entraînement pour 234 scénarios, 57 rapports de test indépendants et huit textes fictifs ambigus ou hors catégorie réservés à la vérification. Le test compare les méthodes sur les mêmes 57 rapports. La validation croisée répartit les groupes de scénarios en cinq plis, avec stratification conjointe sur la gravité et le type. Les deux pipelines optimisent séparément le F1-macro.
+
+Le volume `discipline_models` reçoit `gravite.joblib` et `type_incident.joblib`. Le service entraîne les deux modèles au démarrage si un fichier manque. Après une modification du corpus ou du réglage, reconstruisez l’image et relancez explicitement l’entraînement. Le cache `bert_cache` permet à Flask de charger BERT hors ligne après la première préparation.
+
+```powershell
+docker compose build ml frontend
+docker compose run --rm --no-deps ml python -m ml.train
+docker compose up -d --no-deps --force-recreate ml frontend
+docker compose exec -T ml python -m ml.evaluate
+```
+
+L’évaluation produit l’accuracy, les métriques macro, les matrices de confusion et les identifiants des erreurs, qui correspondent à la colonne `scenario` du corpus. Les lignes des matrices correspondent aux annotations et les colonnes aux prédictions, dans l’ordre donné par `labels`. Les seuils d’incertitude utilisent la probabilité maximale, l’écart avec la deuxième classe et la couverture du vocabulaire. Lorsque le modèle signale une incertitude, l’interface demande une vérification humaine et laisse les champs de décision à saisir. Les analyses précédemment enregistrées restent consultables avec leurs résultats d’origine.
+
+#### Résultats sur les 57 rapports fictifs indépendants
+
+| Méthode | Cible | Accuracy | Précision macro | Rappel macro | F1-macro |
+| --- | --- | ---: | ---: | ---: | ---: |
+| TF-IDF historique | Gravité | 59,6 % | 58,8 % | 63,4 % | 59,7 % |
+| TF-IDF optimisé | Gravité | 75,4 % | 75,6 % | 76,6 % | 76,0 % |
+| BERT + mots-clés | Gravité | 36,8 % | 40,2 % | 37,7 % | 31,1 % |
+| TF-IDF optimisé | Type | 93,0 % | 94,4 % | 93,5 % | 93,5 % |
+
+Le modèle de gravité reconnaît 15 des 23 cas modérés, contre 7 pour le modèle historique, et 15 des 18 cas graves. Il sous-estime notamment des retards répétés (`test_04`) et une menace écrite confirmée (`test_47`). Le modèle de type confond entre autres une insulte isolée avec un harcèlement (`test_20`) et un retard décrit sans le nommer avec un non-respect des consignes (`test_05`). BERT + mots-clés propose « Grave » 43 fois sur 57, y compris pour une insulte avec la précision « ne se sont jamais frappés » (`test_56`).
+
+Les seuils actuels demandent une vérification pour 51 des 57 rapports annotés et pour les huit cas ambigus ou hors catégorie. Les métriques du tableau mesurent la meilleure classe proposée avant application de ces seuils.
+
+Les mesures concernent un petit échantillon fictif. Le fichier de résultats inclut les quatre matrices de confusion et tous les identifiants d’erreurs. [Résultats complets de l’évaluation Docker](school-ml/data/evaluation.json)
+
+Le test Edge `holdout` a contrôlé l’affichage et la transmission de 28 nouveaux rapports. Les deux propositions et leurs distributions étaient présentes dans chacun des 28 brouillons MySQL. Un rapport de démonstration a été envoyé, relu et validé avec une gravité choisie par l’administrateur, puis affiché à l’élève concerné.
 
 ## API
 
