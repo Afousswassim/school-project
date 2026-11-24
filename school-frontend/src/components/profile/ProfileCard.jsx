@@ -1,4 +1,6 @@
 import { FiEdit2, FiMail, FiMapPin, FiPhone, FiShield, FiUser } from 'react-icons/fi'
+import { StatusBadge } from '../WorkspaceUI'
+import ProfileAvatar from './ProfileAvatar'
 
 function Field({ icon: Icon, label, value }) {
   return (
@@ -13,8 +15,8 @@ function Field({ icon: Icon, label, value }) {
 }
 
 function formatDate(value) {
-  if (!value) return 'Not provided'
-  return new Intl.DateTimeFormat(undefined, { year: 'numeric', month: 'short', day: 'numeric' }).format(new Date(value))
+  const date = new Date(value)
+  return value && Number.isFinite(date.getTime()) ? new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeZone: 'UTC' }).format(date) : 'Not provided'
 }
 
 function roleTitle(role) {
@@ -23,7 +25,6 @@ function roleTitle(role) {
 
 export default function ProfileCard({ profile, photoUrl, onEdit }) {
   const fullName = `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || profile.name
-  const initials = `${profile.first_name?.[0] || profile.name?.[0] || 'U'}${profile.last_name?.[0] || ''}`.toUpperCase()
   const classInfo = profile.class_info
     ? [profile.class_info.name, profile.class_info.level, profile.class_info.section, profile.class_info.academic_year].filter(Boolean).join(' / ')
     : ''
@@ -33,13 +34,11 @@ export default function ProfileCard({ profile, photoUrl, onEdit }) {
     <div className="data-surface profile-card">
       <div className="profile-card-header">
         <div className="profile-identity">
-          <div className="profile-avatar">
-            {photoUrl ? <img src={photoUrl} alt="" /> : <span>{initials}</span>}
-          </div>
+          <ProfileAvatar profile={profile} photoUrl={photoUrl} />
           <div>
             <div className="d-flex align-items-center flex-wrap gap-2 mb-2">
               <h2 className="h3 mb-0">{fullName}</h2>
-              <span className={`profile-role-badge profile-role-${profile.role}`}>{roleTitle(profile.role)}</span>
+              <span className="profile-role-badge">{roleTitle(profile.role)}</span>
             </div>
             <p className="text-muted mb-0">{profile.email}</p>
           </div>
@@ -55,8 +54,8 @@ export default function ProfileCard({ profile, photoUrl, onEdit }) {
         <Field icon={FiPhone} label="Phone" value={profile.phone} />
         <Field icon={FiMapPin} label="Address" value={profile.address} />
         <Field icon={FiUser} label="Date of birth" value={formatDate(profile.date_of_birth)} />
-        <Field icon={FiUser} label="Gender" value={roleTitle(profile.gender)} />
-        <Field icon={FiShield} label="Account status" value={roleTitle(profile.status)} />
+        <Field icon={FiUser} label="Gender" value={profile.gender && roleTitle(profile.gender)} />
+        <Field icon={FiShield} label="Account status" value={profile.status && <StatusBadge value={profile.status} />} />
         {profile.role === 'student' ? <Field icon={FiUser} label="Class" value={classInfo} /> : null}
         {profile.role === 'teacher' ? <Field icon={FiUser} label="Subjects" value={subjects || profile.qualification} /> : null}
         <Field icon={FiUser} label="Created" value={formatDate(profile.created_at)} />

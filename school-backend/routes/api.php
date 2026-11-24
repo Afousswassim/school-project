@@ -21,13 +21,14 @@ require_once __DIR__ . '/../models/Subject.php';
 require_once __DIR__ . '/../models/ClassModel.php';
 require_once __DIR__ . '/../models/Grade.php';
 require_once __DIR__ . '/../models/Absence.php';
-require_once __DIR__ . '/../models/Payment.php';
+require_once __DIR__ . '/../models/DisciplineReport.php';
 require_once __DIR__ . '/../models/Profile.php';
 require_once __DIR__ . '/../models/Setting.php';
 require_once __DIR__ . '/../controllers/AuthController.php';
 require_once __DIR__ . '/../controllers/ResourceController.php';
 require_once __DIR__ . '/../controllers/ProfileController.php';
 require_once __DIR__ . '/../controllers/SettingsController.php';
+require_once __DIR__ . '/../controllers/DisciplineReportController.php';
 
 set_exception_handler(fn (Throwable $e) => Response::json(false, getenv('APP_ENV') === 'production' ? 'Server error' : $e->getMessage(), null, 500));
 
@@ -90,7 +91,6 @@ if (($segments[0] ?? '') === 'dashboard') {
         $teacher = new Teacher();
         $subject = new Subject();
         $classModel = new ClassModel();
-        $payment = new Payment();
         $grade = new Grade();
         $absence = new Absence();
         
@@ -99,27 +99,11 @@ if (($segments[0] ?? '') === 'dashboard') {
         $teacherData = $teacher->all(['limit' => 1]);
         $subjectData = $subject->all(['limit' => 1]);
         $classData = $classModel->all(['limit' => 1]);
-        $paymentsData = $payment->all(['limit' => 10000]);
 
         $totalStudents = $studentData['total'] ?? 0;
         $totalTeachers = $teacherData['total'] ?? 0;
         $totalSubjects = $subjectData['total'] ?? 0;
         $totalClasses = $classData['total'] ?? 0;
-        $totalPayments = $paymentsData['total'] ?? 0;
-
-        // Calculate payment amounts
-        $paidAmount = 0.0;
-        $pendingAmount = 0.0;
-        $paymentsItems = is_array($paymentsData['items'] ?? null) ? array_values(array_filter($paymentsData['items'], 'is_array')) : [];
-        foreach ($paymentsItems as $p) {
-            $status = $p['status'] ?? '';
-            $amount = (float) ($p['amount'] ?? 0);
-            if ($status === 'paid') {
-                $paidAmount += $amount;
-            } elseif ($status === 'pending' || $status === 'overdue') {
-                $pendingAmount += $amount;
-            }
-        }
 
         // Get absence and grade stats
         $absencesData = $absence->all(['limit' => 10000]);
@@ -144,9 +128,7 @@ if (($segments[0] ?? '') === 'dashboard') {
             'total_teachers' => $totalTeachers,
             'total_subjects' => $totalSubjects,
             'total_classes' => $totalClasses,
-            'total_payments' => $totalPayments,
-            'paid_amount' => number_format($paidAmount, 2),
-            'pending_amount' => number_format($pendingAmount, 2),
+            'pending_discipline_reports' => (new DisciplineReport())->pendingCount(),
             'absences_count' => $totalAbsences,
             'average_grade' => number_format($averageGrade, 2),
             'total_attendance_records' => $totalAbsences,
@@ -160,6 +142,41 @@ if (($segments[0] ?? '') === 'dashboard') {
     }
 }
 
+if (($segments[0] ?? '') === 'discipline-reports') {
+    $controller = new DisciplineReportController();
+    $action = $segments[1] ?? '';
+    $id = filter_var($segments[2] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+    $role = match ($action) {
+        'classes', 'students', 'analyze', 'submit' => 'teacher',
+        'review' => 'admin',
+        'mine' => 'student',
+        default => Response::json(false, 'Route not found', null, 404),
+    };
+    $userId = (int) AuthMiddleware::requireRoles([$role])['sub'];
+
+    if ($method === 'POST' && count($segments) === 4 && $segments[3] === 'reconsideration' && in_array($action, ['mine', 'review'], true)) {
+        if (!$id) {
+            Response::json(false, 'Rapport introuvable.', null, 404);
+        }
+        match ($action) {
+            'mine' => $controller->requestReconsideration($userId, $id, $body),
+            'review' => $controller->resolveReconsideration($userId, $id, $body),
+        };
+    }
+
+    match ([$method, $action, count($segments)]) {
+        ['GET', 'classes', 2] => $controller->classes($userId),
+        ['GET', 'students', 2] => $controller->students($userId),
+        ['POST', 'analyze', 2] => $controller->analyze($userId, $body),
+        ['POST', 'submit', 2] => $controller->submit($userId, $body),
+        ['GET', 'review', 2] => $controller->reviewList(),
+        ['GET', 'review', 3] => $id ? $controller->reviewDetails($id) : Response::json(false, 'Rapport introuvable.', null, 404),
+        ['POST', 'review', 3] => $id ? $controller->validate($userId, $id, $body) : Response::json(false, 'Rapport introuvable.', null, 404),
+        ['GET', 'mine', 2] => $controller->studentReports($userId),
+        default => Response::json(false, 'Route not found', null, 404),
+    };
+}
+
 $resources = [
     'students' => Student::class,
     'teachers' => Teacher::class,
@@ -168,7 +185,6 @@ $resources = [
     'grades' => Grade::class,
     'attendance' => Absence::class,
     'absences' => Absence::class,
-    'payments' => Payment::class,
 ];
 
 $resourceRoles = [
@@ -179,7 +195,6 @@ $resourceRoles = [
     'grades' => ['read' => ['admin', 'teacher', 'student'], 'write' => ['admin', 'teacher']],
     'attendance' => ['read' => ['admin', 'teacher', 'student'], 'write' => ['admin', 'teacher']],
     'absences' => ['read' => ['admin', 'teacher', 'student'], 'write' => ['admin', 'teacher']],
-    'payments' => ['read' => ['admin'], 'write' => ['admin']],
 ];
 
 $resource = $segments[0] ?? '';
@@ -188,9 +203,14 @@ if (!isset($resources[$resource])) {
 }
 
 $permission = in_array($method, ['POST', 'PUT', 'PATCH', 'DELETE'], true) ? 'write' : 'read';
-AuthMiddleware::requireRoles($resourceRoles[$resource][$permission] ?? ['admin']);
+$resourceUser = AuthMiddleware::requireRoles($resourceRoles[$resource][$permission] ?? ['admin']);
+$readOwnerId = match ($resourceUser['role']) {
+    'student' => (int) $resourceUser['sub'],
+    'teacher' => $resource === 'classes' ? (int) $resourceUser['sub'] : null,
+    default => null,
+};
 
-$controller = new ResourceController(new $resources[$resource]());
+$controller = new ResourceController(new $resources[$resource](), $readOwnerId);
 $id = isset($segments[1]) ? (int) $segments[1] : null;
 
 match ($method) {

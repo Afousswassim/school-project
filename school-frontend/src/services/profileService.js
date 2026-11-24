@@ -1,5 +1,11 @@
 import api from '../api/client'
 
+export function profilePhotoUrl(path) {
+  if (!path || /^https?:\/\//i.test(path)) return path || ''
+  const base = import.meta.env.VITE_API_URL || 'http://localhost:8000/api'
+  return base.replace(/\/api\/?$/, '') + path
+}
+
 export const profileService = {
   async get() {
     const { data } = await api.get('/profile')

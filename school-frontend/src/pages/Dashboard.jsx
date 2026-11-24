@@ -1,144 +1,99 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
+import { FiArrowRight, FiBookOpen, FiCalendar, FiCheckCircle, FiClipboard, FiFileText, FiGrid, FiUser, FiUsers, FiXCircle } from 'react-icons/fi'
 import StatCard from '../components/StatCard'
+import { PageHeading, PageState } from '../components/WorkspaceUI'
 import { resourceService } from '../services/resourceService'
 import { dashboardService } from '../services/dashboardService'
 import { useAuth } from '../context/AuthContext'
 
-const roleStats = {
-  admin: [
-    ['students', 'Students', 'primary'],
-    ['teachers', 'Teachers', 'success'],
-    ['subjects', 'Subjects', 'warning'],
-    ['payments', 'Payments', 'info'],
-  ],
+const adminResources = [
+  ['students', 'Students', FiUsers, 'primary', '/students', 'total_students'],
+  ['teachers', 'Teachers', FiUser, 'success', '/teachers', 'total_teachers'],
+  ['subjects', 'Subjects', FiBookOpen, 'info', '/subjects', 'total_subjects'],
+]
+const roleResources = {
+  admin: adminResources,
   teacher: [
-    ['classes', 'My Classes', 'primary'],
-    ['grades', 'Grades', 'success'],
-    ['attendance', 'Attendance', 'warning'],
+    ['classes', 'My Classes', FiGrid, 'primary', '/my-classes'],
+    ['grades', 'Grades', FiClipboard, 'info', '/grades'],
+    ['attendance', 'Attendance', FiCalendar, 'success', '/attendance'],
   ],
   student: [
-    ['grades', 'My Grades', 'primary'],
-    ['attendance', 'My Attendance', 'success'],
+    ['grades', 'My Grades', FiClipboard, 'primary', '/my-grades'],
+    ['attendance', 'My Attendance', FiCalendar, 'success', '/my-attendance'],
   ],
 }
+const reportLinks = {
+  admin: ['/discipline-reports/review', 'Rapports à examiner'],
+  teacher: ['/discipline-reports', 'Rapports disciplinaires'],
+  student: ['/my-discipline-reports', 'Mes rapports disciplinaires'],
+}
+const number = new Intl.NumberFormat()
 
 export default function Dashboard() {
   const { user } = useAuth()
-  const statResources = useMemo(() => roleStats[user?.role] || [], [user?.role])
-  const [stats, setStats] = useState({})
-  const [dashboardStats, setDashboardStats] = useState(null)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState(null)
+  const role = user.role
+  const resources = roleResources[role]
+  const [snapshot, setSnapshot] = useState(null)
+  const [revision, setRevision] = useState(0)
+  const current = snapshot?.role === role && snapshot?.revision === revision ? snapshot : null
+  const dashboard = current?.dashboard
+  const [reportPath, reportLabel] = reportLinks[role]
 
   useEffect(() => {
-    if (user?.role === 'admin') {
-      // Load comprehensive statistics for admin dashboard
-      setLoading(true)
-      setError(null)
-      dashboardService
-        .getStats()
-        .then((data) => {
-          setDashboardStats(data)
-          // Also populate basic stats from the dashboard data
-          const basicStats = {
-            students: data.total_students,
-            teachers: data.total_teachers,
-            subjects: data.total_subjects,
-            payments: data.total_payments,
-          }
-          setStats(basicStats)
-        })
-        .catch((err) => {
-          console.error('Failed to load dashboard stats:', err)
-          setError('Failed to load dashboard statistics')
-          // Fallback to resource counts
-          Promise.all(statResources.map(([resource]) => resourceService.list(resource, { limit: 1 })))
-            .then((results) => {
-              const nextStats = {}
-              statResources.forEach(([resource], index) => {
-                nextStats[resource] = results[index].total
-              })
-              setStats(nextStats)
-            })
-            .catch(() => {})
-        })
-        .finally(() => setLoading(false))
-    } else {
-      // Load resource counts for non-admin users
-      Promise.all(statResources.map(([resource]) => resourceService.list(resource, { limit: 1 })))
-        .then((results) => {
-          const nextStats = {}
-          statResources.forEach(([resource], index) => {
-            nextStats[resource] = results[index].total
-          })
-          setStats(nextStats)
-        })
-        .catch(() => {})
+    const controller = new AbortController()
+
+    async function load() {
+      if (role === 'admin') {
+        try {
+          const dashboard = await dashboardService.getStats()
+          if (!controller.signal.aborted) setSnapshot({ role, revision, dashboard })
+          return
+        } catch {
+          if (controller.signal.aborted) return
+        }
+      }
+      const results = await Promise.allSettled(resources.map(([resource]) => resourceService.list(resource, { limit: 1 }, controller.signal)))
+      if (!controller.signal.aborted) setSnapshot({ role, revision, results, incomplete: role === 'admin' || results.some((result) => result.status === 'rejected') })
     }
-  }, [user?.role, statResources])
+
+    load()
+    return () => controller.abort()
+  }, [role, resources, revision])
 
   return (
     <section className="content-section">
-      <div className="section-heading">
-        <div>
-          <p className="text-uppercase text-muted small mb-1">{user?.role} dashboard</p>
-          <h2>Overview</h2>
-        </div>
-      </div>
-
-      {/* Admin Dashboard Statistics */}
-      {user?.role === 'admin' && dashboardStats && (
-        <>
-          <div className="mt-4">
-            <h3 className="h5 mb-3">Organization Overview</h3>
-            <div className="stats-grid">
-              <StatCard label="Total Students" value={dashboardStats.total_students ?? 0} tone="primary" />
-              <StatCard label="Total Teachers" value={dashboardStats.total_teachers ?? 0} tone="success" />
-              <StatCard label="Total Subjects" value={dashboardStats.total_subjects ?? 0} tone="warning" />
-              <StatCard label="Total Classes" value={dashboardStats.total_classes ?? 0} tone="info" />
-            </div>
-          </div>
-
-          <div className="mt-4">
-            <h3 className="h5 mb-3">Payments Overview</h3>
-            <div className="stats-grid">
-              <StatCard label="Total Payments" value={dashboardStats.total_payments ?? 0} tone="primary" />
-              <StatCard label="Paid Amount" value={`$${dashboardStats.paid_amount ?? '0.00'}`} tone="success" />
-              <StatCard label="Pending Amount" value={`$${dashboardStats.pending_amount ?? '0.00'}`} tone="warning" />
-            </div>
-          </div>
-
-          <div className="mt-4">
-            <h3 className="h5 mb-3">Attendance & Academic Performance</h3>
-            <div className="stats-grid">
-              <StatCard label="Total Attendance Records" value={dashboardStats.total_attendance_records ?? 0} tone="primary" />
-              <StatCard label="Present" value={dashboardStats.present_count ?? 0} tone="success" />
-              <StatCard label="Absent" value={dashboardStats.absent_count ?? 0} tone="danger" />
-              <StatCard label="Average Grade" value={`${dashboardStats.average_grade ?? '0.00'}/100`} tone="info" />
-            </div>
-          </div>
-
-          {error && (
-            <div className="alert alert-warning mt-4" role="alert">
-              {error}
-            </div>
-          )}
-        </>
-      )}
-
-      {/* Non-Admin Quick Stats */}
-      {user?.role !== 'admin' && (
+      <PageHeading title="Dashboard" description={user.name ? `Welcome, ${user.name}` : undefined} />
+      <Link to={reportPath} className="data-surface report-shortcut">
+        <span><FiFileText aria-hidden="true" />{reportLabel}{dashboard && <strong className="status-badge tone-warning">{dashboard.pending_discipline_reports ?? 0}</strong>}</span>
+        <FiArrowRight aria-hidden="true" />
+      </Link>
+      {!current && <PageState loading>Loading dashboard…</PageState>}
+      {current?.incomplete && <div className="alert alert-warning mt-3" role="alert">
+        Some statistics could not be loaded. <button className="btn btn-outline-secondary btn-sm ms-2" onClick={() => setRevision(revision + 1)}>Retry</button>
+      </div>}
+      <section className="dashboard-group">
+        <h2 className="panel-heading">{role === 'admin' ? 'School overview' : 'Academic records'}</h2>
         <div className="stats-grid">
-          {statResources.map(([resource, label, tone]) => (
-            <StatCard key={resource} label={label} value={stats[resource] ?? 0} tone={tone} />
-          ))}
+          {resources.map(([resource, label, icon, tone, to, field], index) => {
+            const value = dashboard?.[field] ?? current?.results?.[index]?.value?.total
+            return <StatCard key={resource} label={label} value={value == null ? undefined : number.format(value)} icon={icon} tone={tone} to={to} />
+          })}
+          {dashboard && <StatCard label="Classes" value={number.format(dashboard.total_classes ?? 0)} icon={FiGrid} tone="info" />}
         </div>
+      </section>
+      {dashboard && (
+        <section className="dashboard-group">
+          <h2 className="panel-heading">Attendance and performance</h2>
+          <div className="stats-grid">
+            <StatCard label="Attendance records" value={number.format(dashboard.total_attendance_records ?? 0)} icon={FiCalendar} />
+            <StatCard label="Present" value={number.format(dashboard.present_count ?? 0)} icon={FiCheckCircle} tone="success" />
+            <StatCard label="Absent" value={number.format(dashboard.absent_count ?? 0)} icon={FiXCircle} tone="danger" />
+            <StatCard label="Average grade" value={`${dashboard.average_grade ?? '0.00'}/100`} icon={FiClipboard} tone="info" />
+          </div>
+        </section>
       )}
-
-      <div className="data-surface mt-4 p-4">
-        <h3 className="h5">Today</h3>
-        <p className="text-muted mb-0">Use the navigation to open the records available for your role.</p>
-      </div>
     </section>
   )
 }

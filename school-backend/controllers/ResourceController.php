@@ -5,18 +5,18 @@ require_once __DIR__ . '/../includes/Response.php';
 
 final class ResourceController
 {
-    public function __construct(private BaseModel $model)
+    public function __construct(private BaseModel $model, private ?int $readOwnerId = null)
     {
     }
 
     public function index(): void
     {
-        Response::json(true, 'Operation successful', $this->model->all($_GET));
+        Response::json(true, 'Operation successful', $this->model->all($_GET, $this->readOwnerId));
     }
 
     public function show(int $id): void
     {
-        $record = $this->model->find($id);
+        $record = $this->model->find($id, $this->readOwnerId);
         if (!$record) {
             Response::json(false, 'Record not found', null, 404);
         }

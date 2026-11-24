@@ -168,7 +168,7 @@ CREATE TABLE settings (
   academic_year VARCHAR(20) NOT NULL DEFAULT '2025-2026',
   school_email VARCHAR(160) NOT NULL DEFAULT 'school@example.com',
   school_phone VARCHAR(40) NOT NULL DEFAULT '+1 (555) 123-4567',
-  school_address TEXT NOT NULL DEFAULT '123 Education Street, Learning City, LC 12345',
+  school_address TEXT NOT NULL DEFAULT ('123 Education Street, Learning City, LC 12345'),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
