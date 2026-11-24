@@ -1,0 +1,204 @@
+{
+  "distribution": {
+    "train": {
+      "total": 936,
+      "gravity": {
+        "1": 312,
+        "2": 312,
+        "3": 312
+      },
+      "type": {
+        "Retard": 80,
+        "Absence injustifiée": 76,
+        "Triche": 108,
+        "Insulte": 108,
+        "Perturbation du cours": 108,
+        "Non-respect des consignes": 120,
+        "Dégradation du matériel": 120,
+        "Harcèlement": 76,
+        "Menace": 72,
+        "Agression physique": 68
+      }
+    },
+    "test": {
+      "total": 57,
+      "gravity": {
+        "1": 16,
+        "2": 23,
+        "3": 18
+      },
+      "type": {
+        "Retard": 5,
+        "Absence injustifiée": 5,
+        "Triche": 6,
+        "Insulte": 6,
+        "Perturbation du cours": 6,
+        "Non-respect des consignes": 7,
+        "Dégradation du matériel": 7,
+        "Harcèlement": 5,
+        "Menace": 5,
+        "Agression physique": 5
+      }
+    },
+    "verification": {
+      "total": 8,
+      "gravity": {
+        "null": 8
+      },
+      "type": {
+        "": 8
+      }
+    }
+  },
+  "tfidf_before_gravity": {
+    "accuracy": 0.5964912280701754,
+    "precision_macro": 0.5884057971014492,
+    "recall_macro": 0.6338566827697263,
+    "f1_macro": 0.5967674992065236,
+    "labels": [1, 2, 3],
+    "confusion_matrix": [
+      [14, 2, 0],
+      [6, 7, 10],
+      [0, 5, 13]
+    ],
+    "errors": [
+      {"scenario": "test_04", "expected": 2, "predicted": 1},
+      {"scenario": "test_06", "expected": 1, "predicted": 2},
+      {"scenario": "test_08", "expected": 2, "predicted": 3},
+      {"scenario": "test_09", "expected": 2, "predicted": 1},
+      {"scenario": "test_10", "expected": 2, "predicted": 1},
+      {"scenario": "test_13", "expected": 2, "predicted": 3},
+      {"scenario": "test_16", "expected": 3, "predicted": 2},
+      {"scenario": "test_18", "expected": 1, "predicted": 2},
+      {"scenario": "test_19", "expected": 2, "predicted": 3},
+      {"scenario": "test_20", "expected": 2, "predicted": 3},
+      {"scenario": "test_21", "expected": 3, "predicted": 2},
+      {"scenario": "test_35", "expected": 2, "predicted": 1},
+      {"scenario": "test_36", "expected": 2, "predicted": 3},
+      {"scenario": "test_38", "expected": 3, "predicted": 2},
+      {"scenario": "test_39", "expected": 2, "predicted": 3},
+      {"scenario": "test_43", "expected": 3, "predicted": 2},
+      {"scenario": "test_44", "expected": 2, "predicted": 1},
+      {"scenario": "test_45", "expected": 2, "predicted": 1},
+      {"scenario": "test_47", "expected": 3, "predicted": 2},
+      {"scenario": "test_49", "expected": 2, "predicted": 3},
+      {"scenario": "test_50", "expected": 2, "predicted": 3},
+      {"scenario": "test_56", "expected": 2, "predicted": 3},
+      {"scenario": "test_57", "expected": 2, "predicted": 3}
+    ]
+  },
+  "tfidf_after_gravity": {
+    "accuracy": 0.7543859649122807,
+    "precision_macro": 0.756155093616394,
+    "recall_macro": 0.7660024154589372,
+    "f1_macro": 0.7601692601692602,
+    "labels": [1, 2, 3],
+    "confusion_matrix": [
+      [13, 3, 0],
+      [4, 15, 4],
+      [0, 3, 15]
+    ],
+    "errors": [
+      {"scenario": "test_04", "expected": 2, "predicted": 1},
+      {"scenario": "test_09", "expected": 2, "predicted": 1},
+      {"scenario": "test_10", "expected": 2, "predicted": 1},
+      {"scenario": "test_16", "expected": 3, "predicted": 2},
+      {"scenario": "test_19", "expected": 2, "predicted": 3},
+      {"scenario": "test_23", "expected": 1, "predicted": 2},
+      {"scenario": "test_28", "expected": 1, "predicted": 2},
+      {"scenario": "test_29", "expected": 2, "predicted": 3},
+      {"scenario": "test_34", "expected": 1, "predicted": 2},
+      {"scenario": "test_35", "expected": 2, "predicted": 3},
+      {"scenario": "test_43", "expected": 3, "predicted": 2},
+      {"scenario": "test_44", "expected": 2, "predicted": 1},
+      {"scenario": "test_47", "expected": 3, "predicted": 2},
+      {"scenario": "test_57", "expected": 2, "predicted": 3}
+    ]
+  },
+  "tfidf_after_type": {
+    "accuracy": 0.9298245614035088,
+    "precision_macro": 0.944047619047619,
+    "recall_macro": 0.9347619047619048,
+    "f1_macro": 0.9353224553224553,
+    "labels": [
+      "Retard",
+      "Absence injustifiée",
+      "Triche",
+      "Insulte",
+      "Perturbation du cours",
+      "Non-respect des consignes",
+      "Dégradation du matériel",
+      "Harcèlement",
+      "Menace",
+      "Agression physique"
+    ],
+    "confusion_matrix": [
+      [4, 0, 0, 0, 0, 1, 0, 0, 0, 0],
+      [0, 5, 0, 0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 6, 0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 5, 0, 0, 0, 1, 0, 0],
+      [0, 0, 0, 0, 6, 0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 1, 6, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0, 1, 6, 0, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0, 5, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0, 0, 5, 0],
+      [0, 0, 0, 0, 0, 0, 0, 0, 0, 5]
+    ],
+    "errors": [
+      {"scenario": "test_05", "expected": "Retard", "predicted": "Non-respect des consignes"},
+      {"scenario": "test_20", "expected": "Insulte", "predicted": "Harcèlement"},
+      {"scenario": "test_31", "expected": "Non-respect des consignes", "predicted": "Perturbation du cours"},
+      {"scenario": "test_33", "expected": "Dégradation du matériel", "predicted": "Non-respect des consignes"}
+    ]
+  },
+  "bert_keywords_gravity": {
+    "accuracy": 0.3684210526315789,
+    "precision_macro": 0.4019933554817276,
+    "recall_macro": 0.3774154589371981,
+    "f1_macro": 0.31079432961115067,
+    "labels": [1, 2, 3],
+    "confusion_matrix": [
+      [2, 1, 13],
+      [4, 4, 15],
+      [1, 2, 15]
+    ],
+    "errors": [
+      {"scenario": "test_01", "expected": 1, "predicted": 3},
+      {"scenario": "test_02", "expected": 1, "predicted": 3},
+      {"scenario": "test_04", "expected": 2, "predicted": 1},
+      {"scenario": "test_05", "expected": 1, "predicted": 3},
+      {"scenario": "test_06", "expected": 1, "predicted": 3},
+      {"scenario": "test_07", "expected": 1, "predicted": 3},
+      {"scenario": "test_08", "expected": 2, "predicted": 3},
+      {"scenario": "test_09", "expected": 2, "predicted": 3},
+      {"scenario": "test_10", "expected": 2, "predicted": 1},
+      {"scenario": "test_11", "expected": 1, "predicted": 2},
+      {"scenario": "test_13", "expected": 2, "predicted": 3},
+      {"scenario": "test_14", "expected": 2, "predicted": 3},
+      {"scenario": "test_17", "expected": 1, "predicted": 3},
+      {"scenario": "test_18", "expected": 1, "predicted": 3},
+      {"scenario": "test_19", "expected": 2, "predicted": 3},
+      {"scenario": "test_22", "expected": 1, "predicted": 3},
+      {"scenario": "test_23", "expected": 1, "predicted": 3},
+      {"scenario": "test_24", "expected": 2, "predicted": 3},
+      {"scenario": "test_25", "expected": 2, "predicted": 3},
+      {"scenario": "test_27", "expected": 1, "predicted": 3},
+      {"scenario": "test_28", "expected": 1, "predicted": 3},
+      {"scenario": "test_29", "expected": 2, "predicted": 3},
+      {"scenario": "test_30", "expected": 2, "predicted": 3},
+      {"scenario": "test_34", "expected": 1, "predicted": 3},
+      {"scenario": "test_35", "expected": 2, "predicted": 3},
+      {"scenario": "test_36", "expected": 2, "predicted": 3},
+      {"scenario": "test_39", "expected": 2, "predicted": 1},
+      {"scenario": "test_40", "expected": 2, "predicted": 1},
+      {"scenario": "test_42", "expected": 3, "predicted": 1},
+      {"scenario": "test_43", "expected": 3, "predicted": 2},
+      {"scenario": "test_49", "expected": 2, "predicted": 3},
+      {"scenario": "test_50", "expected": 2, "predicted": 3},
+      {"scenario": "test_54", "expected": 1, "predicted": 3},
+      {"scenario": "test_55", "expected": 3, "predicted": 2},
+      {"scenario": "test_56", "expected": 2, "predicted": 3},
+      {"scenario": "test_57", "expected": 2, "predicted": 3}
+    ]
+  }
+}

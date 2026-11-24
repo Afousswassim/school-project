@@ -1,5 +1,7 @@
 const assert = require('node:assert/strict')
 const { randomUUID } = require('node:crypto')
+const { readFileSync } = require('node:fs')
+const path = require('node:path')
 const { chromium, request } = require('playwright-core')
 
 const frontendUrl = `http://localhost:${process.env.FRONTEND_HTTP_PORT || 8080}`
@@ -11,6 +13,7 @@ const negation = 'L’élève n’a porté aucun coup et a repris le cours'
 const bertTitle = 'BERT + mots-clés'
 const mlTitle = 'TF-IDF + régression logistique'
 const unavailable = 'Cette méthode est momentanément indisponible.'
+const percent = new Intl.NumberFormat('fr-FR', { style: 'percent', maximumFractionDigits: 1 })
 
 async function assertStatus(http, url, options, expected, label) {
   const response = await http.post(url, options)
@@ -37,7 +40,7 @@ async function analyze(page, report, expectedBertLevel, missingMethod) {
     assert.match(await bert.innerText(), new RegExp(unavailable))
   } else {
     assert.ok(data.bert.result, data.bert.error)
-    assert.equal(data.bert.result.disciplinary_level, expectedBertLevel)
+    if (expectedBertLevel !== undefined) assert.equal(data.bert.result.disciplinary_level, expectedBertLevel)
     assert.match(await bert.innerText(), /Raison[\s\S]*Sentiment[\s\S]*[1-5]\/5/)
   }
   if (missingMethod === 'ml') {
@@ -49,7 +52,17 @@ async function analyze(page, report, expectedBertLevel, missingMethod) {
     assert.ok(Math.abs(probabilities.reduce((sum, value) => sum + value, 0) - 1) < 1e-6)
     const mlText = await ml.innerText()
     assert.match(mlText, /Probabilités/)
+    for (const probability of probabilities) assert.ok(mlText.includes(percent.format(probability)))
     assert.ok(mlText.includes(data.ml.result.incident_type || 'Type indisponible'))
+    if (data.ml.result.incident_type_probabilities) {
+      const distribution = data.ml.result.incident_type_probabilities
+      assert.equal(Object.keys(distribution).length, 10)
+      assert.ok(Math.abs(Object.values(distribution).reduce((sum, value) => sum + value, 0) - 1) < 1e-6)
+      const label = data.ml.result.incident_type
+      const score = percent.format(distribution[label])
+      assert.ok(mlText.includes(`${label} (${score})`))
+      assert.equal(mlText.includes('Vérification humaine requise'), data.ml.result.requires_human_review)
+    }
   }
   console.log(JSON.stringify({ report, bert: await bert.innerText(), ml: await ml.innerText() }))
   return data
@@ -71,6 +84,18 @@ async function read(http, path, headers, expected = 200) {
   return (await response.json()).data
 }
 
+function assertStoredPredictions(stored, original) {
+  const { probabilities, incident_type_probabilities, ...storedLabels } = stored.ml.result
+  const { probabilities: originalGravity, incident_type_probabilities: originalTypes, ...originalLabels } = original.ml.result
+  assert.deepEqual(stored.bert, original.bert)
+  assert.deepEqual(storedLabels, originalLabels)
+  // La conversion JSON de MySQL peut modifier le dernier bit d’un score.
+  for (const [actual, expected] of [[probabilities, originalGravity], [incident_type_probabilities, originalTypes]]) {
+    assert.deepEqual(Object.keys(actual).sort(), Object.keys(expected).sort())
+    for (const label of Object.keys(expected)) assert.ok(Math.abs(actual[label] - expected[label]) < 1e-12, label)
+  }
+}
+
 async function openSchoolPage(page, label, resource) {
   const loading = page.waitForResponse((response) =>
     response.url().startsWith(`${apiUrl}/${resource}?`) && response.request().method() === 'GET')
@@ -79,9 +104,38 @@ async function openSchoolPage(page, label, resource) {
   await page.getByRole('heading', { name: label, exact: true }).waitFor()
 }
 
+async function analyzeHoldout(page) {
+  const csv = readFileSync(path.join(__dirname, '../school-ml/data/rapports_fictifs.csv'), 'utf8')
+  const perType = new Map()
+  const verification = []
+  for (const line of csv.trim().split(/\r?\n/).slice(1)) {
+    const [id, split, , type, report] = line.split(';')
+    if (split === 'verification') verification.push({ id, report })
+    if (split !== 'test') continue
+    const cases = perType.get(type) || []
+    if (cases.length < 2) cases.push({ id, report })
+    perType.set(type, cases)
+  }
+  const reports = [...perType.values()].flat().concat(verification)
+  assert.equal(reports.length, 28)
+  let uncertain = 0
+  const analysisIds = []
+  for (const { id, report } of reports) {
+    const { analysis_id, ml } = await analyze(page, report)
+    assert.ok(Number.isInteger(analysis_id))
+    analysisIds.push(analysis_id)
+    assert.ok(ml.result.incident_type_probabilities, id)
+    if (ml.result.requires_human_review) uncertain += 1
+    if (id.startsWith('verification')) assert.equal(ml.result.requires_human_review, true, id)
+  }
+  console.log(`${reports.length} nouveaux rapports contrôlés dans React via PHP et Flask, dont ${uncertain} orientés vers une vérification humaine.`)
+  console.log('Analyses MySQL : ' + analysisIds.join(','))
+}
+
 async function main() {
-  const missingMethod = process.argv[2]
-  assert.ok([undefined, 'bert', 'ml'].includes(missingMethod), 'Argument attendu : bert ou ml.')
+  const mode = process.argv[2]
+  assert.ok([undefined, 'bert', 'ml', 'holdout'].includes(mode), 'Argument attendu : bert, ml ou holdout.')
+  const missingMethod = mode === 'holdout' ? undefined : mode
   const browser = await chromium.launch({ channel: 'msedge', headless: true })
   const http = await request.newContext()
   try {
@@ -94,6 +148,7 @@ async function main() {
     const student = page.getByLabel('Élève', { exact: true })
     const studentId = Number((await student.selectOption({ label: 'Student User' }))[0])
     assert.ok(studentId > 0)
+    if (mode === 'holdout') await analyzeHoldout(page)
     await analyze(page, late, 1, missingMethod)
     if (missingMethod) return
 
@@ -192,13 +247,19 @@ async function main() {
     const pendingReport = await read(http, reviewPath, adminHeaders)
     assert.equal(pendingReport.report_text, submittedText)
     assert.equal(pendingReport.status, 'pending')
-    assert.deepEqual(pendingReport.predictions, { bert: predictions.bert, ml: predictions.ml })
+    assertStoredPredictions(pendingReport.predictions, predictions)
 
     await adminPage.getByRole('link', { name: 'Rapports disciplinaires', exact: true }).click()
     await adminPage.getByRole('button', { name: `Ouvrir le rapport ${reportId}`, exact: true }).click()
     await adminPage.getByText(submittedText, { exact: true }).waitFor()
     await adminPage.getByRole('article', { name: bertTitle }).waitFor()
-    await adminPage.getByRole('article', { name: mlTitle }).waitFor()
+    const reviewedMl = adminPage.getByRole('article', { name: mlTitle })
+    await reviewedMl.waitFor()
+    assert.ok((await reviewedMl.innerText()).includes(predictions.ml.result.incident_type))
+    if (predictions.ml.result.requires_human_review) {
+      assert.equal(await adminPage.getByLabel('Gravité retenue').inputValue(), '')
+      assert.equal(await adminPage.getByLabel('Type d’incident (facultatif)').inputValue(), '')
+    }
     const correctedSeverity = '2'
     const correctedType = 'Retard — démo ' + reportId
     await adminPage.getByLabel('Gravité retenue').selectOption(correctedSeverity)

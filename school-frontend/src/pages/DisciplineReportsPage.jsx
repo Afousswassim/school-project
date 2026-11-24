@@ -196,8 +196,11 @@ function DisciplinePredictions({ result, headingRef, review = false }) {
           )}
         </ResultCard>
         <ResultCard title="TF-IDF + régression logistique" method={result?.ml}>
-          {({ probabilities, incident_type }) => (
+          {({ probabilities, incident_type, incident_type_probabilities, requires_human_review }) => (
             <dl className="prediction-data">
+              {requires_human_review && <div className="review-analysis-note">
+                <dt>Analyse incertaine</dt><dd>Vérification humaine requise. L’administrateur confirme la décision.</dd>
+              </div>}
               {probabilities && <div>
                 <dt>Probabilités</dt>
                 <dd>
@@ -211,7 +214,15 @@ function DisciplinePredictions({ result, headingRef, review = false }) {
                   </ul>
                 </dd>
               </div>}
-              <div><dt>Type d’incident</dt><dd>{incident_type || "Type indisponible"}</dd></div>
+              <div>
+                <dt>Type d’incident proposé</dt>
+                <dd>
+                  {incident_type || 'Type indisponible'}
+                  {Number.isFinite(incident_type_probabilities?.[incident_type]) && (
+                    <> ({percentage.format(incident_type_probabilities[incident_type])})</>
+                  )}
+                </dd>
+              </div>
             </dl>
           )}
         </ResultCard>
@@ -275,8 +286,9 @@ export function ReviewDisciplineReportsPage() {
       .then(({ data }) => {
         const entry = data.data
         setReport(entry)
-        setSeverity(String(entry.predictions?.ml?.result?.disciplinary_level ?? entry.predictions?.bert?.result?.disciplinary_level ?? ''))
-        setType(entry.predictions?.ml?.result?.incident_type ?? '')
+        const ml = entry.predictions?.ml?.result
+        setSeverity(ml?.requires_human_review ? '' : String(ml?.disciplinary_level ?? entry.predictions?.bert?.result?.disciplinary_level ?? ''))
+        setType(ml?.requires_human_review ? '' : ml?.incident_type ?? '')
       })
       .catch(() => {
         if (!controller.signal.aborted) setError('Impossible d’ouvrir le rapport.')
