@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 header('Access-Control-Allow-Origin: ' . (getenv('CORS_ORIGIN') ?: '*'));
 header('Access-Control-Allow-Headers: Content-Type, Authorization');
+header('Access-Control-Expose-Headers: Content-Disposition');
 header('Access-Control-Allow-Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS');
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
@@ -154,6 +155,13 @@ if (($segments[0] ?? '') === 'discipline-reports') {
     };
     $userId = (int) AuthMiddleware::requireRoles([$role])['sub'];
 
+    if ($method === 'GET' && $action === 'review' && count($segments) === 4 && $segments[3] === 'pdf') {
+        if (!$id) {
+            Response::json(false, 'Rapport introuvable.', null, 404);
+        }
+        $controller->downloadPdf($id);
+    }
+
     if ($method === 'POST' && count($segments) === 4 && $segments[3] === 'reconsideration' && in_array($action, ['mine', 'review'], true)) {
         if (!$id) {
             Response::json(false, 'Rapport introuvable.', null, 404);
@@ -173,6 +181,7 @@ if (($segments[0] ?? '') === 'discipline-reports') {
         ['GET', 'review', 3] => $id ? $controller->reviewDetails($id) : Response::json(false, 'Rapport introuvable.', null, 404),
         ['POST', 'review', 3] => $id ? $controller->validate($userId, $id, $body) : Response::json(false, 'Rapport introuvable.', null, 404),
         ['GET', 'mine', 2] => $controller->studentReports($userId),
+        ['GET', 'mine', 3] => $id ? $controller->studentReport($userId, $id) : Response::json(false, 'Rapport introuvable.', null, 404),
         default => Response::json(false, 'Route not found', null, 404),
     };
 }

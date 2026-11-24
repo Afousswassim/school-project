@@ -200,7 +200,7 @@ async function main() {
       assert.equal(report.status, index === 0 ? 'validated' : 'pending')
       checkStoredPredictions(report.predictions, predictions.get(example.text))
       if (report.status === 'pending') {
-        await adminPage.getByRole('button', { name: `Ouvrir le rapport ${report.id}`, exact: true }).click()
+        await adminPage.getByRole('button', { name: `Ouvrir le rapport ${report.reference}`, exact: true }).click()
         await adminPage.getByText(example.text, { exact: true }).waitFor()
         await adminPage.getByRole('article', { name: 'BERT + mots-clés' }).waitFor()
         await adminPage.getByRole('article', { name: 'TF-IDF + régression logistique' }).waitFor()

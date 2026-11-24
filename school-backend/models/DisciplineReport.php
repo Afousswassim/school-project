@@ -39,18 +39,19 @@ final class DisciplineReport extends BaseModel
 
     public function forReview(): array
     {
-        return $this->db->query("SELECT r.id, r.status, DATE(r.submitted_at) AS report_date,
+        $reports = $this->db->query("SELECT r.id, r.status, YEAR(r.created_at) AS creation_year, DATE(r.submitted_at) AS report_date,
                 CONCAT_WS(' ', s.first_name, s.last_name) AS student_name, q.status AS reconsideration_status
             FROM discipline_reports r LEFT JOIN students s ON s.id = r.student_id
             LEFT JOIN discipline_reconsiderations q ON q.report_id = r.id
             WHERE r.status IN ('pending', 'validated')
             ORDER BY COALESCE(q.status = 'pending', 0) DESC, r.status, r.submitted_at DESC, r.id DESC")->fetchAll();
+        return array_map(self::withReference(...), $reports);
     }
 
     public function reviewDetails(int $id): ?array
     {
-        $stmt = $this->db->prepare("SELECT r.id, r.status, r.report_text, r.predictions, r.finalized_severity,
-                r.finalized_type, DATE(r.submitted_at) AS report_date,
+        $stmt = $this->db->prepare("SELECT r.id, YEAR(r.created_at) AS creation_year, r.status, r.report_text, r.predictions, r.finalized_severity,
+                r.finalized_type, DATE(r.submitted_at) AS report_date, r.validated_at, reviewer.name AS reviewer_name,
                 CONCAT_WS(' ', s.first_name, s.last_name) AS student_name, c.name AS class_name, u.name AS teacher_name,
                 q.status AS reconsideration_status, q.reason, q.response, q.requested_at, q.reviewed_at,
                 q.initial_severity, q.initial_type
@@ -58,6 +59,7 @@ final class DisciplineReport extends BaseModel
             LEFT JOIN students s ON s.id = r.student_id
             LEFT JOIN classes c ON c.id = r.class_id
             LEFT JOIN users u ON u.id = r.teacher_user_id
+            LEFT JOIN users reviewer ON reviewer.id = r.reviewer_user_id
             LEFT JOIN discipline_reconsiderations q ON q.report_id = r.id
             WHERE r.id = ? AND r.status IN ('pending', 'validated')");
         $stmt->execute([$id]);
@@ -66,7 +68,7 @@ final class DisciplineReport extends BaseModel
             return null;
         }
         $report['predictions'] = json_decode($report['predictions'], true, 512, JSON_THROW_ON_ERROR);
-        return self::withReconsideration($report);
+        return self::withReconsideration(self::withReference($report));
     }
 
     public function validate(int $id, ?int $adminId, int $severity, ?string $type): bool
@@ -82,15 +84,21 @@ final class DisciplineReport extends BaseModel
     public function forStudent(int $userId, ?int $id = null): array
     {
         $reportFilter = $id === null ? "" : " AND r.id = ?";
-        $stmt = $this->db->prepare("SELECT r.id, DATE(r.submitted_at) AS report_date,
+        $detailFields = $id === null ? "" : ", r.report_text, teacher.name AS teacher_name";
+        $teacherJoin = $id === null ? "" : "LEFT JOIN users teacher ON teacher.id = r.teacher_user_id";
+        $stmt = $this->db->prepare("SELECT r.id, YEAR(r.created_at) AS creation_year, DATE(r.submitted_at) AS report_date,
                 r.finalized_type, r.finalized_severity,
-                q.status AS reconsideration_status, q.reason, q.response, q.requested_at, q.reviewed_at
+                q.status AS reconsideration_status, q.reason, q.response, q.requested_at, q.reviewed_at{$detailFields}
             FROM discipline_reports r JOIN students s ON s.id = r.student_id
+            {$teacherJoin}
             LEFT JOIN discipline_reconsiderations q ON q.report_id = r.id
             WHERE s.user_id = ? AND r.status = 'validated'{$reportFilter}
             ORDER BY r.submitted_at DESC, r.id DESC");
         $stmt->execute($id === null ? [$userId] : [$userId, $id]);
-        return array_map(self::withReconsideration(...), $stmt->fetchAll());
+        return array_map(
+            static fn (array $report): array => self::withReconsideration(self::withReference($report)),
+            $stmt->fetchAll()
+        );
     }
 
     public function requestReconsideration(int $id, int $userId, string $reason): string
@@ -142,6 +150,13 @@ final class DisciplineReport extends BaseModel
                 $this->db->rollBack();
             }
         }
+    }
+
+    private static function withReference(array $report): array
+    {
+        $report['reference'] = sprintf('RD-%04d-%04d', $report['creation_year'], $report['id']);
+        unset($report['creation_year']);
+        return $report;
     }
 
     private static function withReconsideration(array $report): array

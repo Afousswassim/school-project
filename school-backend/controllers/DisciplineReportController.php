@@ -52,6 +52,25 @@ final class DisciplineReportController
         Response::json(true, 'Rapport chargé.', $report);
     }
 
+    public function downloadPdf(int $id): never
+    {
+        $report = (new DisciplineReport())->reviewDetails($id);
+        if ($report === null || $report['status'] !== 'validated') {
+            Response::json(false, 'Rapport validé introuvable.', null, 404);
+        }
+
+        require_once __DIR__ . '/../services/DisciplineReportPdf.php';
+        $number = sprintf('%03d', $id);
+        $pdf = (new DisciplineReportPdf())->render($report, (new Setting())->getSettings(false) ?? []);
+
+        header('Content-Type: application/pdf');
+        header('Content-Disposition: attachment; filename="rapport-disciplinaire-' . $number . '.pdf"');
+        header('Cache-Control: private, no-store');
+        header('X-Content-Type-Options: nosniff');
+        echo $pdf;
+        exit;
+    }
+
     public function validate(int $adminId, int $id, array $body): void
     {
         $severity = $this->severity($body['severity'] ?? null);
@@ -69,6 +88,15 @@ final class DisciplineReportController
     public function studentReports(int $userId): void
     {
         Response::json(true, 'Rapports chargés.', (new DisciplineReport())->forStudent($userId));
+    }
+
+    public function studentReport(int $userId, int $id): void
+    {
+        $report = (new DisciplineReport())->forStudent($userId, $id)[0] ?? null;
+        if ($report === null) {
+            Response::json(false, 'Rapport introuvable.', null, 404);
+        }
+        Response::json(true, 'Rapport chargé.', $report);
     }
 
     public function requestReconsideration(int $userId, int $id, array $body): void

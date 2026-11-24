@@ -20,7 +20,31 @@
 .reconsideration-text { white-space: pre-wrap; overflow-wrap: anywhere; }
 
 .reconsideration-dialog {
-  width: min(calc(100% - 2rem), 560px);
+  width: min(calc(100% - 2rem), 640px);
+}
+
+.reconsideration-reference {
+  display: inline-block;
+  margin-inline-start: .25rem;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.reconsideration-summary {
+  margin-bottom: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--border-color);
+  border-radius: .75rem;
+  background: var(--accent-soft);
+}
+
+.reconsideration-summary:last-child { margin-bottom: 0; }
+
+.reconsideration-summary .reconsideration-meta {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  padding-bottom: .85rem;
+  border-bottom: 1px solid var(--border-color);
+  overflow-wrap: anywhere;
 }
 
 .reconsideration-dialog-actions,
@@ -40,7 +64,7 @@
 }
 
 @media (max-width: 560px) {
-  .reconsideration-student-table .table { table-layout: fixed; }
+  .reconsideration-summary .reconsideration-meta { grid-template-columns: 1fr; }
   .reconsideration-student-table th,
   .reconsideration-student-table td {
     padding: .65rem .45rem;

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { FiArrowLeft, FiCheckSquare, FiCpu, FiInfo, FiSend } from 'react-icons/fi'
+import { FiArrowLeft, FiCheckSquare, FiCpu, FiDownload, FiInfo, FiSend } from 'react-icons/fi'
 import api from '../api/client'
 import { ReconsiderationBadge, ReconsiderationDialog, ReconsiderationReview } from '../components/DisciplineReconsideration'
 import { PageHeading, PageState, StatusBadge } from '../components/WorkspaceUI'
@@ -240,6 +240,16 @@ function reportDate(date) {
   return date && Number.isFinite(timestamp.getTime()) ? <time dateTime={timestamp.toISOString()}>{reportDateFormat.format(timestamp)}</time> : '—'
 }
 
+function DownloadReportButton({ id, compact = false, busy, disabled, onDownload }) {
+  return (
+    <button type="button" className={compact ? 'btn btn-outline-primary btn-sm text-nowrap' : 'btn btn-primary text-nowrap'}
+      onClick={() => onDownload(id)} disabled={disabled}
+      aria-label={compact ? 'Télécharger le PDF du rapport ' + id : undefined}>
+      <FiDownload aria-hidden="true" /> {busy ? 'Téléchargement…' : compact ? 'PDF' : 'Télécharger le PDF'}
+    </button>
+  )
+}
+
 export function ReviewDisciplineReportsPage() {
   const [reports, setReports] = useState(null)
   const [selection, setSelection] = useState(null)
@@ -250,6 +260,8 @@ export function ReviewDisciplineReportsPage() {
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [saving, setSaving] = useState(false)
+  const [downloadingId, setDownloadingId] = useState(null)
+  const [downloadError, setDownloadError] = useState('')
   const detailHeading = useRef(null)
   const decisionHeading = useRef(null)
   const reconsiderationHeading = useRef(null)
@@ -311,6 +323,27 @@ export function ReviewDisciplineReportsPage() {
     setNotice('')
   }
 
+  async function downloadPdf(id) {
+    setDownloadError('')
+    setDownloadingId(id)
+    try {
+      const response = await api.get('/discipline-reports/review/' + id + '/pdf', { responseType: 'blob' })
+      const filename = response.headers['content-disposition']?.match(/filename="([^"]+)"/)?.[1]
+      const url = URL.createObjectURL(response.data)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = filename || 'rapport-disciplinaire-' + String(id).padStart(3, '0') + '.pdf'
+      document.body.append(link)
+      link.click()
+      link.remove()
+      setTimeout(() => URL.revokeObjectURL(url), 1000)
+    } catch {
+      setDownloadError('Impossible de télécharger le PDF du rapport n°' + id + '.')
+    } finally {
+      setDownloadingId(null)
+    }
+  }
+
   function validate(event) {
     event.preventDefault()
     updateReview('', { severity: Number(severity), incident_type: type.trim() || null }, 'Impossible de valider le rapport.')
@@ -342,9 +375,12 @@ export function ReviewDisciplineReportsPage() {
           <FiArrowLeft aria-hidden="true" /> Retour à la liste
         </button>
         <header className="section-heading review-header">
-          <h1 id="review-title" ref={detailHeading} tabIndex={-1}>Rapport n°{report.id}</h1>
+          <h1 id="review-title" ref={detailHeading} tabIndex={-1}>Rapport {report.reference}</h1>
           <StatusBadge value={report.status} label={reportStatus[report.status]} />
+          {report.status === 'validated' && <DownloadReportButton id={report.id} disabled={downloadingId !== null}
+            busy={downloadingId === report.id} onDownload={downloadPdf} />}
         </header>
+        {downloadError && <p className="alert alert-danger" role="alert">{downloadError}</p>}
         <div className="review-layout">
           <div className="review-content">
             <section className="data-surface surface-padding" aria-labelledby="review-facts-heading">
@@ -410,22 +446,26 @@ export function ReviewDisciplineReportsPage() {
     <section className="content-section" lang="fr">
       <PageHeading title="Rapports disciplinaires" description="Consultez les signalements et enregistrez la décision." />
       {listError && <p className="alert alert-danger" role="alert">{listError}</p>}
+      {downloadError && <p className="alert alert-danger" role="alert">{downloadError}</p>}
       {!reports && !listError && <div className="data-surface"><PageState loading>Chargement des rapports…</PageState></div>}
       {reports?.length === 0 && <div className="data-surface"><PageState>Aucun rapport transmis.</PageState></div>}
       {reports?.length > 0 && (
         <div className="data-surface table-responsive table-scroll report-table" role="region" tabIndex={0} aria-label="Liste des rapports" ref={reportList}>
           <table className="table align-middle mb-0">
-            <thead><tr><th scope="col">Rapport</th><th scope="col">Élève</th><th scope="col">Date</th><th scope="col">Statut</th></tr></thead>
+            <thead><tr><th scope="col">Référence</th><th scope="col">Élève</th><th scope="col">Date</th><th scope="col">Statut</th><th scope="col">Actions</th></tr></thead>
             <tbody>
               {reports.map((entry) => (
                 <tr key={entry.id} className={selection?.id === entry.id ? "report-selected" : undefined}>
-                  <td><button type="button" className="btn btn-link" aria-pressed={selection?.id === entry.id} disabled={saving} onClick={() => openReport(entry.id)}>Ouvrir le rapport {entry.id}</button></td>
+                  <td><button type="button" className="btn btn-link text-nowrap" aria-label={'Ouvrir le rapport ' + entry.reference}
+                    aria-pressed={selection?.id === entry.id} disabled={saving} onClick={() => openReport(entry.id)}>{entry.reference}</button></td>
                   <td>{entry.student_name || '—'}</td>
                   <td>{reportDate(entry.report_date)}</td>
                   <td><div className="reconsideration-cell">
                     <StatusBadge value={entry.status} label={reportStatus[entry.status]} />
                     {entry.reconsideration_status === 'pending' && <StatusBadge label="Réexamen en attente" tone="warning" />}
                   </div></td>
+                  <td>{entry.status === 'validated' && <DownloadReportButton id={entry.id} compact
+                    disabled={downloadingId !== null} busy={downloadingId === entry.id} onDownload={downloadPdf} />}</td>
                 </tr>
               ))}
             </tbody>
@@ -442,8 +482,8 @@ export function StudentDisciplineReportsPage() {
   const [reports, setReports] = useState(null)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
-  const [selectedId, setSelectedId] = useState(null)
-  const selected = reports?.find((entry) => entry.id === selectedId)
+  const [selection, setSelection] = useState(null)
+  const selected = reports?.find((entry) => entry.id === selection?.id)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -457,15 +497,15 @@ export function StudentDisciplineReportsPage() {
 
   function sent(updated, message) {
     setReports((entries) => updated
-      ? entries.map((entry) => entry.id === updated.id ? updated : entry)
-      : entries.filter((entry) => entry.id !== selectedId))
-    setSelectedId(null)
+      ? entries.map((entry) => entry.id === updated.id ? { ...entry, reconsideration: updated.reconsideration } : entry)
+      : entries.filter((entry) => entry.id !== selection.id))
+    setSelection(null)
     setNotice(message)
   }
 
-  function openDialog(id) {
+  function openDialog(id, mode) {
     setNotice('')
-    setSelectedId(id)
+    setSelection({ id, mode })
   }
 
   return (
@@ -478,10 +518,11 @@ export function StudentDisciplineReportsPage() {
       {reports?.length > 0 && (
         <div className="data-surface table-responsive table-scroll report-table reconsideration-student-table" role="region" tabIndex={0} aria-label="Liste des rapports">
           <table className="table align-middle mb-0">
-            <thead><tr><th scope="col">Date</th><th scope="col">Type validé</th><th scope="col">Gravité validée</th><th scope="col">Réexamen</th></tr></thead>
+            <thead><tr><th scope="col">Référence</th><th scope="col">Date</th><th scope="col">Type validé</th><th scope="col">Gravité validée</th><th scope="col">Réexamen</th><th scope="col">Actions</th></tr></thead>
             <tbody>
               {reports.map((entry) => (
                 <tr key={entry.id}>
+                  <th scope="row" className="text-nowrap">{entry.reference}</th>
                   <td>{reportDate(entry.report_date)}</td>
                   <td>{entry.finalized_type || 'Non renseigné'}</td>
                   <td><SeverityBadge value={entry.finalized_severity} /></td>
@@ -490,21 +531,22 @@ export function StudentDisciplineReportsPage() {
                       {entry.reconsideration ? (
                         <>
                           <ReconsiderationBadge status={entry.reconsideration.status} />
-                          <button type="button" className="btn btn-link" onClick={() => openDialog(entry.id)}>
+                          <button type="button" className="btn btn-link" onClick={() => openDialog(entry.id, 'reconsideration')}>
                             {entry.reconsideration.status === 'pending' ? 'Voir la demande' : 'Voir la réponse'}
                           </button>
                         </>
-                      ) : <button type="button" className="btn btn-link" onClick={() => openDialog(entry.id)}>Demander un réexamen</button>}
+                      ) : <button type="button" className="btn btn-link" onClick={() => openDialog(entry.id, 'reconsideration')}>Demander un réexamen</button>}
                     </div>
                   </td>
+                  <td><button type="button" className="btn btn-link text-nowrap" onClick={() => openDialog(entry.id, 'details')}>Voir les détails</button></td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       )}
-      {selected && <ReconsiderationDialog key={selected.id} report={selected} date={reportDate(selected.report_date)}
-        onClose={() => setSelectedId(null)} onSent={sent} />}
+      {selected && <ReconsiderationDialog key={selected.id} summary={selected} mode={selection.mode}
+        formatDate={reportDate} SeverityBadge={SeverityBadge} onClose={() => setSelection(null)} onSent={sent} />}
     </section>
   )
 }
