@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { FiCamera, FiUpload } from 'react-icons/fi'
+import ProfileAvatar from './ProfileAvatar'
 
 const MAX_BYTES = 2 * 1024 * 1024
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp']
@@ -16,12 +17,6 @@ export default function ProfilePhotoUploader({ profile, photoUrl, onUpload, savi
       }
     }
   }, [preview])
-
-  const initials = useMemo(() => {
-    const first = profile?.first_name?.[0] || profile?.name?.[0] || 'U'
-    const last = profile?.last_name?.[0] || ''
-    return `${first}${last}`.toUpperCase()
-  }, [profile])
 
   function handleFileChange(event) {
     const selected = event.target.files?.[0]
@@ -63,9 +58,7 @@ export default function ProfilePhotoUploader({ profile, photoUrl, onUpload, savi
 
   return (
     <form className="profile-photo-panel" onSubmit={handleSubmit}>
-      <div className="profile-avatar profile-avatar-xl">
-        {preview || photoUrl ? <img src={preview || photoUrl} alt="" /> : <span>{initials}</span>}
-      </div>
+      <ProfileAvatar profile={profile} photoUrl={preview || photoUrl} className="profile-avatar profile-avatar-xl" />
       <label className="btn btn-outline-primary d-inline-flex align-items-center gap-2 mb-0">
         <FiCamera aria-hidden="true" />
         <span>Choose Photo</span>

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { FiSave, FiX } from 'react-icons/fi'
 
 const emptyForm = {
@@ -21,8 +21,16 @@ function profileToForm(profile) {
   }
 }
 
-export default function EditProfileForm({ profile, onCancel, onSave, saving }) {
+export default function EditProfileForm({ profile, error, onCancel, onSave, saving }) {
   const [form, setForm] = useState(() => profileToForm(profile) || emptyForm)
+
+  const dialog = useRef(null)
+
+  useEffect(() => {
+    const element = dialog.current
+    element.showModal()
+    return () => element.close()
+  }, [])
 
   function updateField(event) {
     setForm((current) => ({ ...current, [event.target.name]: event.target.value }))
@@ -34,18 +42,19 @@ export default function EditProfileForm({ profile, onCancel, onSave, saving }) {
   }
 
   return (
-    <div className="profile-modal-backdrop" role="presentation">
-      <div className="profile-modal data-surface" role="dialog" aria-modal="true" aria-labelledby="edit-profile-title">
-        <div className="profile-modal-header">
-          <div>
-            <p className="text-uppercase text-muted small mb-1">Profile</p>
-            <h3 className="h5 mb-0" id="edit-profile-title">Edit Profile</h3>
-          </div>
-          <button className="btn btn-outline-secondary icon-btn" type="button" onClick={onCancel} title="Close">
-            <FiX aria-hidden="true" />
-          </button>
-        </div>
-        <form className="profile-form-grid" onSubmit={handleSubmit}>
+    <dialog ref={dialog} className="profile-modal data-surface" aria-labelledby="edit-profile-title" onCancel={(event) => {
+      event.preventDefault()
+      if (!saving) onCancel()
+    }}>
+      <div className="profile-modal-header">
+        <h2 className="panel-heading mb-0" id="edit-profile-title">Edit Profile</h2>
+        <button className="btn btn-outline-secondary icon-btn" type="button" onClick={onCancel} disabled={saving} aria-label="Close">
+          <FiX aria-hidden="true" />
+        </button>
+      </div>
+      {error && <div className="alert alert-danger" role="alert">{error}</div>}
+      <form onSubmit={handleSubmit}>
+        <fieldset disabled={saving} className="profile-form-grid">
           <div>
             <label className="form-label" htmlFor="first_name">First name</label>
             <input className="form-control" id="first_name" name="first_name" value={form.first_name} onChange={updateField} required />
@@ -76,7 +85,7 @@ export default function EditProfileForm({ profile, onCancel, onSave, saving }) {
             <textarea className="form-control" id="address" name="address" rows="3" value={form.address} onChange={updateField} />
           </div>
           <div className="profile-form-actions">
-            <button className="btn btn-outline-secondary d-inline-flex align-items-center gap-2" type="button" onClick={onCancel}>
+            <button className="btn btn-outline-secondary d-inline-flex align-items-center gap-2" type="button" onClick={onCancel} disabled={saving}>
               <FiX aria-hidden="true" />
               <span>Cancel</span>
             </button>
@@ -85,8 +94,8 @@ export default function EditProfileForm({ profile, onCancel, onSave, saving }) {
               <span>{saving ? 'Saving...' : 'Save Changes'}</span>
             </button>
           </div>
-        </form>
-      </div>
-    </div>
+        </fieldset>
+      </form>
+    </dialog>
   )
 }

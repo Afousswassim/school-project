@@ -5,7 +5,7 @@ import AppLayout from './layout/AppLayout.jsx'
 import Login from './pages/Login.jsx'
 import Dashboard from './pages/Dashboard.jsx'
 import ResourcePage from './pages/ResourcePage.jsx'
-import SimplePage from './pages/SimplePage.jsx'
+import DisciplineReportsPage, { ReviewDisciplineReportsPage, StudentDisciplineReportsPage } from './pages/DisciplineReportsPage.jsx'
 import ProfilePage from './pages/ProfilePage.jsx'
 import SettingsPage from './pages/SettingsPage.jsx'
 import './App.css'
@@ -22,7 +22,7 @@ function App() {
               <Route path="/students" element={<ResourcePage resource="students" />} />
               <Route path="/teachers" element={<ResourcePage resource="teachers" />} />
               <Route path="/subjects" element={<ResourcePage resource="subjects" />} />
-              <Route path="/payments" element={<ResourcePage resource="payments" />} />
+              <Route path="/discipline-reports/review" element={<ReviewDisciplineReportsPage />} />
               <Route path="/settings" element={<SettingsPage />} />
             </Route>
             <Route element={<RoleProtectedRoute roles={['teacher', 'student']} />}>
@@ -33,11 +33,13 @@ function App() {
               <Route path="/my-classes" element={<ResourcePage resource="classes" />} />
               <Route path="/grades" element={<ResourcePage resource="grades" />} />
               <Route path="/attendance" element={<ResourcePage resource="attendance" />} />
+              <Route path="/discipline-reports" element={<DisciplineReportsPage />} />
             </Route>
             <Route element={<RoleProtectedRoute roles={['student']} />}>
               <Route path="/student" element={<Dashboard />} />
               <Route path="/my-grades" element={<ResourcePage resource="grades" />} />
               <Route path="/my-attendance" element={<ResourcePage resource="attendance" />} />
+              <Route path="/my-discipline-reports" element={<StudentDisciplineReportsPage />} />
             </Route>
           </Route>
         </Route>

@@ -1,0 +1,54 @@
+.review-secondary,
+.reconsideration-fields {
+  display: grid;
+  min-width: 0;
+  gap: 1rem;
+}
+
+.reconsideration-meta {
+  display: grid;
+  gap: .75rem;
+  margin-bottom: 1rem;
+}
+
+.reconsideration-meta dt {
+  color: var(--muted-color);
+  font-size: .85rem;
+}
+
+.reconsideration-meta dd { margin-bottom: 0; }
+.reconsideration-text { white-space: pre-wrap; overflow-wrap: anywhere; }
+
+.reconsideration-dialog {
+  width: min(calc(100% - 2rem), 560px);
+}
+
+.reconsideration-dialog-actions,
+.reconsideration-cell {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .5rem;
+}
+
+.reconsideration-dialog-actions { justify-content: flex-end; }
+.reconsideration-cell .btn { text-align: start; }
+
+.reconsideration-dialog :is(.form-control, .btn):focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
+@media (max-width: 560px) {
+  .reconsideration-student-table .table { table-layout: fixed; }
+  .reconsideration-student-table th,
+  .reconsideration-student-table td {
+    padding: .65rem .45rem;
+    overflow-wrap: anywhere;
+  }
+
+  .reconsideration-student-table th,
+  .reconsideration-student-table time { white-space: normal; }
+
+  .reconsideration-cell .status-badge { white-space: normal; }
+}

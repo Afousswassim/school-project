@@ -1,8 +1,11 @@
-export default function StatCard({ label, value, tone = 'primary' }) {
-  return (
-    <div className={`stat-card border-${tone}`}>
-      <div className="text-muted small text-uppercase">{label}</div>
-      <div className="display-6 fw-semibold">{value}</div>
-    </div>
-  )
+import { Link } from 'react-router-dom'
+
+export default function StatCard({ label, value, tone = 'primary', icon: Icon, to }) {
+  const className = `stat-card tone-${tone}`
+  const content = <>
+    <span className="stat-icon"><Icon aria-hidden="true" /></span>
+    <strong className="stat-value">{value ?? '—'}</strong>
+    <span className="stat-label">{label}</span>
+  </>
+  return to ? <Link to={to} className={className}>{content}</Link> : <div className={className}>{content}</div>
 }

@@ -35,14 +35,16 @@ final class AuthController
             }
         }
 
-        $roleId = (int) ($data['role_id'] ?? 3);
+        if (!in_array($data['role_id'] ?? 3, [3, '3'], true)) {
+            Response::json(false, 'Public registration is restricted to students', null, 403);
+        }
         $model = new User();
         if ($model->findByEmail((string) $data['email'])) {
             Response::json(false, 'Email already registered', null, 409);
         }
 
         $user = $model->createUser([
-            'role_id' => $roleId,
+            'role_id' => 3,
             'name' => $data['name'],
             'email' => $data['email'],
             'password' => $data['password'],

@@ -1,0 +1,9 @@
+.env
+.env.*
+!.env.example
+
+__pycache__/
+*.py[cod]
+/school-ml/artifacts/
+/school-backend/uploads/profiles/*
+!/school-backend/uploads/profiles/.htaccess

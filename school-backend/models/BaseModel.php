@@ -8,20 +8,26 @@ abstract class BaseModel
     protected array $fillable = [];
     protected array $searchable = [];
     protected string $select = '*';
+    protected ?string $readScope = null;
 
     public function __construct()
     {
         $this->db = Database::connection();
     }
 
-    public function all(array $query = []): array
+    public function all(array $query = [], ?int $ownerId = null): array
     {
         $page = max(1, (int) ($query['page'] ?? 1));
         $limit = min(100, max(1, (int) ($query['limit'] ?? 10)));
         $offset = ($page - 1) * $limit;
         $search = trim((string) ($query['search'] ?? ''));
 
-        [$where, $params] = $this->searchClause($search);
+        [$conditions, $params] = $this->searchClause($search);
+        if ($ownerId !== null) {
+            $conditions[] = $this->ownershipCondition();
+            $params[':owner_id'] = $ownerId;
+        }
+        $where = $conditions ? 'WHERE ' . implode(' AND ', $conditions) : '';
         $count = $this->db->prepare("SELECT COUNT(*) FROM {$this->table} {$where}");
         $count->execute($params);
 
@@ -41,10 +47,16 @@ abstract class BaseModel
         ];
     }
 
-    public function find(int $id): ?array
+    public function find(int $id, ?int $ownerId = null): ?array
     {
-        $stmt = $this->db->prepare("SELECT {$this->select} FROM {$this->table} WHERE id = :id");
-        $stmt->execute([':id' => $id]);
+        $sql = "SELECT {$this->select} FROM {$this->table} WHERE id = :id";
+        $params = [':id' => $id];
+        if ($ownerId !== null) {
+            $sql .= ' AND ' . $this->ownershipCondition();
+            $params[':owner_id'] = $ownerId;
+        }
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
         return $stmt->fetch() ?: null;
     }
 
@@ -92,10 +104,21 @@ abstract class BaseModel
     protected function searchClause(string $search): array
     {
         if ($search === '') {
-            return ['', []];
+            return [[], []];
         }
         $columns = $this->searchable ?: $this->fillable ?: ['id'];
-        $likes = array_map(fn ($column) => "{$column} LIKE :search", $columns);
-        return ['WHERE ' . implode(' OR ', $likes), [':search' => "%{$search}%"]];
+        $likes = [];
+        $params = [];
+        foreach ($columns as $index => $column) {
+            $parameter = ':search' . $index;
+            $likes[] = "{$column} LIKE {$parameter}";
+            $params[$parameter] = "%{$search}%";
+        }
+        return [['(' . implode(' OR ', $likes) . ')'], $params];
+    }
+
+    private function ownershipCondition(): string
+    {
+        return $this->readScope ?? throw new LogicException('No ownership scope for ' . $this->table);
     }
 }

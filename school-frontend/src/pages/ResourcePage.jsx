@@ -1,13 +1,16 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { FiChevronLeft, FiChevronRight, FiPlus, FiSearch, FiX } from 'react-icons/fi'
 import DataTable from '../components/DataTable'
 import ResourceForm from '../components/ResourceForm'
+import { PageHeading, PageState } from '../components/WorkspaceUI'
 import { resourceService } from '../services/resourceService'
 import { useAuth } from '../context/AuthContext'
 
 const config = {
   students: {
     title: 'Students',
-    columns: ['id', 'student_number', 'first_name', 'last_name', 'email', 'status'],
+    singular: 'Student',
+    columns: ['first_name', 'last_name', 'student_number', 'email', 'status', 'id'],
     fields: [
       ['student_number', 'Student Number', 'text', true], ['first_name', 'First Name', 'text', true], ['last_name', 'Last Name', 'text', true],
       ['email', 'Email', 'email', true], ['phone', 'Phone'], ['class_id', 'Class ID', 'number'], ['date_of_birth', 'Birth Date', 'date'],
@@ -16,33 +19,33 @@ const config = {
   },
   teachers: {
     title: 'Teachers',
-    columns: ['id', 'employee_number', 'first_name', 'last_name', 'email', 'status'],
+    singular: 'Teacher',
+    columns: ['first_name', 'last_name', 'employee_number', 'email', 'status', 'id'],
     fields: [['employee_number', 'Employee Number', 'text', true], ['first_name', 'First Name', 'text', true], ['last_name', 'Last Name', 'text', true], ['email', 'Email', 'email', true], ['phone', 'Phone'], ['hire_date', 'Hire Date', 'date'], ['qualification', 'Qualification'], ['status', 'Status', 'select', true, ['active', 'inactive']]],
   },
   subjects: {
     title: 'Subjects',
-    columns: ['id', 'code', 'name', 'credits', 'status'],
+    singular: 'Subject',
+    columns: ['name', 'code', 'credits', 'status', 'id'],
     fields: [['code', 'Code', 'text', true], ['name', 'Name', 'text', true], ['teacher_id', 'Teacher ID', 'number'], ['description', 'Description'], ['credits', 'Credits', 'number'], ['status', 'Status', 'select', true, ['active', 'inactive']]],
   },
   classes: {
     title: 'Classes',
-    columns: ['id', 'name', 'level', 'section', 'academic_year', 'capacity', 'status'],
+    singular: 'Class',
+    columns: ['name', 'level', 'section', 'academic_year', 'capacity', 'status', 'id'],
     fields: [['name', 'Name', 'text', true], ['level', 'Level', 'text', true], ['section', 'Section'], ['academic_year', 'Academic Year', 'text', true], ['teacher_id', 'Teacher ID', 'number'], ['capacity', 'Capacity', 'number'], ['status', 'Status', 'select', true, ['active', 'inactive']]],
   },
   grades: {
     title: 'Grades',
-    columns: ['id', 'student_id', 'subject_id', 'exam_name', 'score', 'max_score', 'term'],
+    singular: 'Grade',
+    columns: ['exam_name', 'subject_id', 'score', 'max_score', 'exam_date', 'term', 'student_id', 'id'],
     fields: [['student_id', 'Student ID', 'number', true], ['subject_id', 'Subject ID', 'number', true], ['teacher_id', 'Teacher ID', 'number'], ['exam_name', 'Exam Name', 'text', true], ['exam_date', 'Exam Date', 'date', true], ['score', 'Score', 'number', true], ['max_score', 'Max Score', 'number', true], ['term', 'Term', 'text', true], ['remarks', 'Remarks']],
   },
   attendance: {
     title: 'Attendance',
-    columns: ['id', 'student_id', 'class_id', 'subject_id', 'attendance_date', 'status'],
+    singular: 'Attendance Record',
+    columns: ['attendance_date', 'status', 'subject_id', 'class_id', 'student_id', 'id'],
     fields: [['student_id', 'Student ID', 'number', true], ['class_id', 'Class ID', 'number'], ['subject_id', 'Subject ID', 'number'], ['teacher_id', 'Teacher ID', 'number'], ['attendance_date', 'Date', 'date', true], ['status', 'Status', 'select', true, ['present', 'absent', 'late', 'excused']], ['remarks', 'Remarks']],
-  },
-  payments: {
-    title: 'Payments',
-    columns: ['id', 'student_name', 'amount', 'due_date', 'payment_date', 'status'],
-    fields: [['student_id', 'Student ID', 'number', true], ['amount', 'Amount', 'number', true], ['due_date', 'Due Date', 'date', true], ['payment_date', 'Payment Date', 'date'], ['method', 'Method', 'select', false, ['cash', 'card', 'bank_transfer', 'check']], ['reference', 'Reference'], ['status', 'Status', 'select', true, ['pending', 'paid', 'overdue', 'cancelled']], ['description', 'Description']],
   },
 }
 
@@ -50,39 +53,81 @@ function toField([name, label, type = 'text', required = false, options = []]) {
   return { name, label, type, required, options, step: type === 'number' ? '0.01' : undefined }
 }
 
+const pageSize = 10
+const labels = { id: 'ID', subject_id: 'Subject', student_id: 'Student ID', class_id: 'Class ID', exam_name: 'Assessment', max_score: 'Out of' }
+
 export default function ResourcePage({ resource }) {
+  return <ResourceRecords key={resource} resource={resource} />
+}
+
+function ResourceRecords({ resource }) {
   const meta = config[resource]
   const { user } = useAuth()
   const canWrite = user?.role === 'admin' || (['grades', 'attendance'].includes(resource) && user?.role === 'teacher')
-  const fields = useMemo(() => meta.fields.map(toField), [meta])
-  const columns = meta.columns.map((key) => ({ key, label: key.replaceAll('_', ' ').replace(/\b\w/g, (c) => c.toUpperCase()) }))
-  const [rows, setRows] = useState([])
+  const fields = meta.fields.map(toField)
+  const columns = meta.columns.filter((key) => user?.role !== 'student' || !['id', 'student_id'].includes(key))
+    .map((key, index) => ({
+      key,
+      label: labels[key] || key.replaceAll('_', ' ').replace(/\b\w/g, (character) => character.toUpperCase()),
+      className: index === 0 ? 'primary-cell' : ['id', 'score', 'max_score', 'student_id', 'class_id'].includes(key) ? 'number-cell' : undefined,
+    }))
   const [page, setPage] = useState(1)
-  const [total, setTotal] = useState(0)
   const [search, setSearch] = useState('')
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing] = useState(null)
   const [form, setForm] = useState({})
-  const [error, setError] = useState('')
-
-  const load = useCallback(async () => {
-    const data = await resourceService.list(resource, { page, limit: 10, search })
-    setRows(data.items)
-    setTotal(data.total)
-  }, [resource, page, search])
+  const [response, setResponse] = useState(null)
+  const [revision, setRevision] = useState(0)
+  const [actionError, setActionError] = useState('')
+  const [notice, setNotice] = useState('')
+  const [saving, setSaving] = useState(false)
+  const formHeading = useRef(null)
+  const formTrigger = useRef(null)
+  const query = JSON.stringify([page, search, revision])
+  const current = response?.query === query ? response : null
+  const rows = current?.data?.items ?? []
+  const total = current?.data?.total ?? 0
+  const reload = () => setRevision((value) => value + 1)
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    load().catch((err) => setError(err.response?.data?.message || 'Failed to load records'))
-  }, [load])
+    const controller = new AbortController()
+    const timer = setTimeout(() => {
+      resourceService.list(resource, { page, limit: pageSize, search }, controller.signal)
+        .then((data) => {
+          if (!controller.signal.aborted) setResponse({ query, data })
+        })
+        .catch((err) => {
+          if (!controller.signal.aborted) setResponse({ query, error: err.response?.data?.message || 'Failed to load records' })
+        })
+    }, search ? 220 : 0)
+    return () => {
+      clearTimeout(timer)
+      controller.abort()
+    }
+  }, [resource, page, search, query])
 
-  function startCreate() {
+  useEffect(() => {
+    if (showForm) formHeading.current?.focus()
+  }, [showForm, editing])
+
+  function closeForm() {
+    setShowForm(false)
+    formTrigger.current?.focus()
+  }
+
+  function startCreate(event) {
+    formTrigger.current = event.currentTarget
+    setActionError('')
+    setNotice('')
     setEditing(null)
     setForm({})
     setShowForm(true)
   }
 
-  function startEdit(row) {
+  function startEdit(row, event) {
+    formTrigger.current = event.currentTarget
+    setActionError('')
+    setNotice('')
     setEditing(row)
     setForm(row)
     setShowForm(true)
@@ -90,51 +135,84 @@ export default function ResourcePage({ resource }) {
 
   async function submit(event) {
     event.preventDefault()
-    setError('')
+    setActionError('')
+    setSaving(true)
     try {
       if (editing) {
         await resourceService.update(resource, editing.id, form)
       } else {
         await resourceService.create(resource, form)
       }
-      setShowForm(false)
-      await load()
+      closeForm()
+      setNotice(editing ? 'Changes saved.' : 'Record created.')
+      reload()
     } catch (err) {
-      setError(err.response?.data?.message || 'Save failed')
+      setActionError(err.response?.data?.message || 'Save failed')
+    } finally {
+      setSaving(false)
     }
   }
 
   async function remove(id) {
     if (!window.confirm('Delete this record?')) return
-    await resourceService.remove(resource, id)
-    await load()
+    setActionError('')
+    setNotice('')
+    setSaving(true)
+    try {
+      await resourceService.remove(resource, id)
+      if (rows.length === 1 && page > 1) setPage(page - 1)
+      setNotice('Record deleted.')
+      reload()
+    } catch (err) {
+      setActionError(err.response?.data?.message || 'Delete failed')
+    } finally {
+      setSaving(false)
+    }
   }
 
-  const totalPages = Math.max(1, Math.ceil(total / 10))
+  const totalPages = Math.max(1, Math.ceil(total / pageSize))
+  function updateSearch(value) {
+    setPage(1)
+    setSearch(value)
+  }
 
   return (
     <section className="content-section">
-      <div className="section-heading">
-        <div>
-          <p className="text-uppercase text-muted small mb-1">Management</p>
-          <h2>{meta.title}</h2>
+      <PageHeading title={user.role === 'student' || resource === 'classes' ? 'My ' + meta.title : meta.title} action={canWrite && (
+        <button type="button" className="btn btn-primary" disabled={saving} onClick={startCreate}><FiPlus aria-hidden="true" />New {meta.singular}</button>
+      )} />
+      {actionError && <div className="alert alert-danger" role="alert">{actionError}</div>}
+      {notice && <div className="alert alert-success" role="status">{notice}</div>}
+      {showForm && <div className="data-surface record-form">
+        <h2 className="panel-heading" ref={formHeading} tabIndex={-1}>{editing ? 'Edit' : 'New'} {meta.singular}</h2>
+        <ResourceForm fields={fields} form={form} editing={editing} saving={saving} onChange={(name, value) => setForm({ ...form, [name]: value })} onSubmit={submit} onCancel={closeForm} />
+      </div>}
+      <section className="data-surface resource-panel" aria-label={meta.title + ' records'} aria-busy={!current}>
+        <div className="resource-toolbar">
+          <h2 className="toolbar-title">Records</h2>
+          <div className="table-search">
+            <FiSearch aria-hidden="true" />
+            <input className="form-control" type="search" aria-label="Search records" placeholder="Search records" value={search} onChange={(event) => updateSearch(event.target.value)} />
+            {search && <button type="button" className="btn clear-search" aria-label="Clear search" onClick={() => updateSearch('')}><FiX aria-hidden="true" /></button>}
+          </div>
         </div>
-        {canWrite && <button className="btn btn-primary" onClick={startCreate}>New {meta.title.slice(0, -1)}</button>}
-      </div>
-      {error && <div className="alert alert-danger">{error}</div>}
-      {showForm && <div className="data-surface p-4 mb-4"><ResourceForm fields={fields} form={form} editing={editing} onChange={(name, value) => setForm({ ...form, [name]: value })} onSubmit={submit} onCancel={() => setShowForm(false)} /></div>}
-      <div className="toolbar">
-        <input className="form-control" placeholder="Search records" value={search} onChange={(event) => { setPage(1); setSearch(event.target.value) }} />
-      </div>
-      <DataTable columns={columns} rows={rows} onEdit={startEdit} onDelete={remove} canWrite={canWrite} />
-      <div className="d-flex justify-content-between align-items-center mt-3">
-        <span className="text-muted small">{total} records</span>
-        <div className="btn-group">
-          <button className="btn btn-outline-secondary" disabled={page <= 1} onClick={() => setPage(page - 1)}>Previous</button>
-          <button className="btn btn-outline-secondary" disabled>{page} / {totalPages}</button>
-          <button className="btn btn-outline-secondary" disabled={page >= totalPages} onClick={() => setPage(page + 1)}>Next</button>
-        </div>
-      </div>
+        {!current && <PageState loading>Loading records…</PageState>}
+        {current?.error && <div className="surface-padding">
+          <div className="alert alert-danger" role="alert">{current.error}</div>
+          <button type="button" className="btn btn-outline-secondary" onClick={reload}>Retry</button>
+        </div>}
+        {current?.data && <>
+          <DataTable label={meta.title + ' table'} columns={columns} rows={rows} onEdit={startEdit} onDelete={remove} canWrite={canWrite} busy={saving} emptyMessage={search ? 'No records match your search.' : 'No records found.'} />
+          <footer className="table-footer">
+            <span aria-live="polite">{rows.length ? `${(page - 1) * pageSize + 1}–${(page - 1) * pageSize + rows.length} of ${total}` : '0 records'}</span>
+            <nav className="table-pagination" aria-label="Table pagination">
+              <button type="button" className="btn btn-outline-secondary" aria-label="Previous" disabled={page <= 1} onClick={() => setPage(page - 1)}><FiChevronLeft aria-hidden="true" /><span>Previous</span></button>
+              <span>Page {page} of {totalPages}</span>
+              <button type="button" className="btn btn-outline-secondary" aria-label="Next" disabled={page >= totalPages} onClick={() => setPage(page + 1)}><span>Next</span><FiChevronRight aria-hidden="true" /></button>
+            </nav>
+          </footer>
+        </>}
+      </section>
     </section>
   )
 }

@@ -1,16 +1,12 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { FiRefreshCw } from 'react-icons/fi'
 import ChangePasswordForm from '../components/profile/ChangePasswordForm'
 import EditProfileForm from '../components/profile/EditProfileForm'
 import ProfileCard from '../components/profile/ProfileCard'
 import ProfilePhotoUploader from '../components/profile/ProfilePhotoUploader'
-import { profileService } from '../services/profileService'
+import { profilePhotoUrl, profileService } from '../services/profileService'
 import { useAuth } from '../context/AuthContext'
-
-function apiOrigin() {
-  const base = import.meta.env.VITE_API_URL || 'http://localhost:8000/api'
-  return base.replace(/\/api\/?$/, '')
-}
+import { PageHeading, PageState } from '../components/WorkspaceUI'
 
 function errorMessage(error, fallback) {
   return error.response?.data?.message || error.message || fallback
@@ -24,11 +20,7 @@ export default function ProfilePage() {
   const [editing, setEditing] = useState(false)
   const [notice, setNotice] = useState(null)
 
-  const photoUrl = useMemo(() => {
-    if (!profile?.profile_photo) return ''
-    if (/^https?:\/\//i.test(profile.profile_photo)) return profile.profile_photo
-    return `${apiOrigin()}${profile.profile_photo}`
-  }, [profile?.profile_photo])
+  const photoUrl = profilePhotoUrl(profile?.profile_photo)
 
   async function loadProfile() {
     setLoading(true)
@@ -120,42 +112,43 @@ export default function ProfilePage() {
 
   return (
     <section className="content-section">
-      <div className="section-heading">
-        <div>
-          <p className="text-uppercase text-muted small mb-1">Account</p>
-          <h2>Profile</h2>
-        </div>
-        <button className="btn btn-outline-secondary d-inline-flex align-items-center gap-2" type="button" onClick={loadProfile} disabled={loading}>
-          <FiRefreshCw aria-hidden="true" />
-          <span>Refresh</span>
+      <PageHeading title="Profile" action={(
+        <button className="btn btn-outline-secondary" type="button" onClick={loadProfile} disabled={loading}>
+          <FiRefreshCw aria-hidden="true" /> Refresh
         </button>
-      </div>
+      )} />
 
-      {notice ? <div className={`alert alert-${notice.type}`}>{notice.text}</div> : null}
+      {notice && !editing ? <div role={notice.type === 'danger' ? 'alert' : 'status'} className={`alert alert-${notice.type}`}>{notice.text}</div> : null}
 
       {loading ? (
-        <div className="data-surface profile-loading">
-          <div className="spinner-border text-primary" role="status" />
-          <span>Loading profile...</span>
-        </div>
+        <div className="data-surface"><PageState loading>Loading profile…</PageState></div>
       ) : profile ? (
         <div className="profile-layout">
           <div className="profile-main-column">
-            <ProfileCard profile={profile} photoUrl={photoUrl} onEdit={() => setEditing(true)} />
+            <ProfileCard profile={profile} photoUrl={photoUrl} onEdit={() => {
+              setNotice(null)
+              setEditing(true)
+            }} />
             <ChangePasswordForm onSave={handlePasswordSave} saving={saving === 'password'} />
           </div>
           <aside className="profile-side-column">
             <div className="data-surface p-4">
-              <div className="profile-panel-heading">
-                <div>
-                  <p className="text-uppercase text-muted small mb-1">Photo</p>
-                  <h3 className="h5 mb-0">Profile Picture</h3>
-                </div>
-              </div>
+              <h2 className="panel-heading">Profile Picture</h2>
               <ProfilePhotoUploader profile={profile} photoUrl={photoUrl} onUpload={handlePhotoUpload} saving={saving === 'photo'} />
             </div>
           </aside>
-          {editing ? <EditProfileForm profile={profile} onCancel={() => setEditing(false)} onSave={handleSave} saving={saving === 'profile'} /> : null}
+          {editing && (
+            <EditProfileForm
+              profile={profile}
+              error={notice?.type === 'danger' ? notice.text : ''}
+              onCancel={() => {
+                setEditing(false)
+                setNotice(null)
+              }}
+              onSave={handleSave}
+              saving={saving === 'profile'}
+            />
+          )}
         </div>
       ) : null}
     </section>

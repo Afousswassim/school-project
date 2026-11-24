@@ -1,5 +1,7 @@
 # School Management System - Admin Sections Implementation Summary
 
+This historical summary describes the original admin implementation. See [the current demo and API documentation](README.md) for disciplinary reports and the removal of payments from the application.
+
 ## Overview
 Fully implemented and made functional three critical admin sections: **Payments**, **Reports**, and **Settings**. All sections now have complete backend endpoints, frontend pages, database support, and test data.
 

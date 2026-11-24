@@ -1,8 +1,8 @@
 import api from '../api/client'
 
 export const resourceService = {
-  async list(resource, params) {
-    const { data } = await api.get(`/${resource}`, { params })
+  async list(resource, params, signal) {
+    const { data } = await api.get(`/${resource}`, { params, signal })
     return data.data
   },
   async create(resource, payload) {

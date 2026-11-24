@@ -14,7 +14,7 @@ services:
       - mysql_data:/var/lib/mysql
       - ./school-backend/school_db.sql:/docker-entrypoint-initdb.d/01-school.sql:ro
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot_pass"]
+      test: ["CMD", "mysqladmin", "ping", "--protocol=TCP", "-h", "127.0.0.1", "-uroot", "-proot_pass"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -30,21 +30,37 @@ services:
       DB_DATABASE: school_db
       DB_USERNAME: school_user
       DB_PASSWORD: school_pass
-      JWT_SECRET: replace_with_a_long_random_secret
+      JWT_SECRET: "${JWT_SECRET:-replace_with_a_long_random_secret}"
       JWT_TTL: 86400
-      CORS_ORIGIN: http://localhost:3000
+      CORS_ORIGIN: "${CORS_ORIGIN:-http://localhost:${FRONTEND_HTTP_PORT:-8080}}"
+      DISCIPLINE_ML_URL: http://ml:5000
+    volumes:
+      - profile_uploads:/var/www/html/uploads/profiles
     ports:
       - "8000:80"
     depends_on:
       mysql:
         condition: service_healthy
 
+  ml:
+    build: ./school-ml
+    restart: unless-stopped
+    environment:
+      HF_HOME: /cache/huggingface
+      HF_HUB_DISABLE_XET: "1"
+      HF_HUB_OFFLINE: "1"
+      OMP_NUM_THREADS: "2"
+      OPENBLAS_NUM_THREADS: "2"
+    volumes:
+      - bert_cache:/cache/huggingface
+      - discipline_models:/app/artifacts
+
   frontend:
     build: ./school-frontend
     container_name: school_frontend
     restart: unless-stopped
     ports:
-      - "3000:80"
+      - "${FRONTEND_HTTP_PORT:-8080}:80"
     depends_on:
       - backend
 
@@ -56,9 +72,12 @@ services:
       PMA_HOST: mysql
       PMA_PORT: 3306
     ports:
-      - "8080:80"
+      - "${PHPMYADMIN_HTTP_PORT:-3000}:80"
     depends_on:
       - mysql
 
 volumes:
   mysql_data:
+  bert_cache:
+  discipline_models:
+  profile_uploads:
