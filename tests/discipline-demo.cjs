@@ -250,7 +250,7 @@ async function main() {
     assertStoredPredictions(pendingReport.predictions, predictions)
 
     await adminPage.getByRole('link', { name: 'Rapports disciplinaires', exact: true }).click()
-    await adminPage.getByRole('button', { name: `Ouvrir le rapport ${reportId}`, exact: true }).click()
+    await adminPage.getByRole('button', { name: `Ouvrir le rapport ${pendingReport.reference}`, exact: true }).click()
     await adminPage.getByText(submittedText, { exact: true }).waitFor()
     await adminPage.getByRole('article', { name: bertTitle }).waitFor()
     const reviewedMl = adminPage.getByRole('article', { name: mlTitle })

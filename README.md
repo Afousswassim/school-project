@@ -5,7 +5,8 @@ Full-stack school platform with React/Vite, PHP MVC REST API, MySQL, JWT authent
 ## Run With Docker
 
 ```bash
-docker compose up --build
+docker compose up -d --build
+docker compose ps
 ```
 
 Open:
@@ -13,6 +14,8 @@ Open:
 - Frontend: http://localhost:8080
 - Backend API: http://localhost:8000/api
 - phpMyAdmin: http://localhost:3000
+
+Use `docker compose stop` to stop the project while keeping its containers and volumes.
 
 Seed login accounts use password `password`:
 
@@ -76,6 +79,12 @@ Ouvrez http://localhost:8080. Les comptes ci-dessous utilisent `password`.
 - `student@school.test` consulte la date, le type et la gravité retenus dans **Mes rapports disciplinaires**.
 - `student.demo.other@school.test` sert à vérifier l’isolation entre élèves. Le jeu scolaire l’affecte à **Grade 10 B**.
 
+### Exporter un rapport validé
+
+Le schéma actuel conserve la date d’envoi du rapport. La date de l’incident ne figure pas dans le PDF, faute de champ dédié.
+
+Depuis le compte administrateur, ouvrez **Rapports disciplinaires**. L’action **PDF** de la liste et le bouton **Télécharger le PDF** du détail sont disponibles pour les rapports validés. L’export utilise les résultats initiaux conservés dans MySQL et la décision en vigueur, avec le réexamen s’il existe.
+
 ### Tests navigateur et API
 
 Avec Node.js et Microsoft Edge installés, depuis la racine du dépôt.
@@ -85,7 +94,10 @@ $browserDeps = Join-Path $env:TEMP 'school-discipline-browser'
 npm.cmd install --prefix $browserDeps --no-audit --no-fund playwright-core@1.56.1
 $env:NODE_PATH = Join-Path $browserDeps 'node_modules'
 node tests/discipline-demo.cjs
+node tests/discipline-pdf.cjs
 ```
+
+`node tests/discipline-pdf.cjs` utilise les comptes de démonstration et les deux modèles démarrés. Il crée deux rapports fictifs, vérifie les téléchargements et les permissions, puis retire ses rapports de MySQL. Les PDF restent dans `tests/artifacts/discipline-pdf/`.
 
 `node tests/discipline-demo.cjs holdout` vérifie en plus le rendu de 20 rapports annotés réservés au test (deux par type) et de huit cas à vérifier.
 

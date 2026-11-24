@@ -5,5 +5,7 @@
 __pycache__/
 *.py[cod]
 /school-ml/artifacts/
+/school-backend/vendor/
+/tests/artifacts/discipline-pdf/
 /school-backend/uploads/profiles/*
 !/school-backend/uploads/profiles/.htaccess

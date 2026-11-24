@@ -11,18 +11,13 @@ final class Setting extends BaseModel
      * Get the first (and usually only) settings record.
      * If no settings exist, create default settings.
      */
-    public function getSettings(): ?array
+    public function getSettings(bool $createDefaults = true): ?array
     {
         $stmt = $this->db->prepare("SELECT * FROM {$this->table} LIMIT 1");
         $stmt->execute();
         $result = $stmt->fetch();
         
-        if (!$result) {
-            // Create default settings if none exist
-            return $this->createDefaultSettings();
-        }
-        
-        return $result;
+        return $result ?: ($createDefaults ? $this->createDefaultSettings() : null);
     }
 
     /**

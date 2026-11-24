@@ -14,19 +14,33 @@ export function ReconsiderationBadge({ status }) {
   return <StatusBadge {...statuses[status]} />
 }
 
-export function ReconsiderationDialog({ report, date, onClose, onSent }) {
+export function ReconsiderationDialog({ summary, mode, formatDate, SeverityBadge, onClose, onSent }) {
   const dialog = useRef(null)
+  const [report, setReport] = useState(null)
+  const [loadError, setLoadError] = useState('')
   const [reason, setReason] = useState('')
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
-  const request = report.reconsideration
+  const request = (report ?? summary).reconsideration
   const hasReply = request && request.status !== 'pending'
+  const title = mode === 'details' ? 'Détails du rapport'
+    : hasReply ? 'Réponse de l’administration' : request ? 'Demande de réexamen' : 'Demander un réexamen'
 
   useEffect(() => {
     const element = dialog.current
     element.showModal()
     return () => element.close()
   }, [])
+
+  useEffect(() => {
+    const controller = new AbortController()
+    api.get('/discipline-reports/mine/' + summary.id, { signal: controller.signal })
+      .then(({ data }) => setReport(data.data))
+      .catch(() => {
+        if (!controller.signal.aborted) setLoadError('Impossible de charger le détail du rapport.')
+      })
+    return () => controller.abort()
+  }, [summary.id])
 
   async function send(event) {
     event.preventDefault()
@@ -53,16 +67,26 @@ export function ReconsiderationDialog({ report, date, onClose, onSent }) {
       if (!saving) onClose()
     }}>
       <div className="profile-modal-header">
-        <h2 className="panel-heading mb-0" id="reconsideration-dialog-title">{hasReply ? 'Réponse de l’administration' : request ? 'Demande de réexamen' : 'Demander un réexamen'}</h2>
+        <h2 className="panel-heading mb-0" id="reconsideration-dialog-title">
+          {title} <span className="reconsideration-reference">{summary.reference}</span>
+        </h2>
         <button type="button" className="btn btn-outline-secondary icon-btn" aria-label="Fermer" onClick={onClose} disabled={saving}>
           <FiX aria-hidden="true" />
         </button>
       </div>
-      <dl className="reconsideration-meta">
-        <div><dt>Date du rapport</dt><dd>{date}</dd></div>
-        <div><dt>Type d’incident</dt><dd>{report.finalized_type || 'Non renseigné'}</dd></div>
-      </dl>
-      {request ? (
+      {loadError && <p className="alert alert-danger mb-0" role="alert">{loadError}</p>}
+      {!report && !loadError && <p className="mb-0" role="status">Chargement du rapport…</p>}
+      {report && <section className="reconsideration-summary" aria-label="Récapitulatif du rapport">
+        <dl className="reconsideration-meta">
+          <div><dt>Date du rapport</dt><dd>{formatDate(report.report_date)}</dd></div>
+          <div><dt>Enseignant</dt><dd>{report.teacher_name || 'Non renseigné'}</dd></div>
+          <div><dt>Type d’incident validé</dt><dd>{report.finalized_type || 'Non renseigné'}</dd></div>
+          <div><dt>Gravité validée</dt><dd><SeverityBadge value={report.finalized_severity} /></dd></div>
+        </dl>
+        <h3 className="h6">Description de l’incident</h3>
+        <p className="reconsideration-text mb-0">{report.report_text || 'Non renseignée'}</p>
+      </section>}
+      {report && mode !== 'details' && (request ? (
         <>
           <ReconsiderationBadge status={request.status} />
           <p className="reconsideration-text mt-3 mb-0">{hasReply ? request.response : request.reason}</p>
@@ -82,7 +106,7 @@ export function ReconsiderationDialog({ report, date, onClose, onSent }) {
             </div>
           </fieldset>
         </form>
-      )}
+      ))}
     </dialog>
   )
 }

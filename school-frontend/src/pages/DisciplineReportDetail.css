@@ -5,7 +5,8 @@
   color: var(--accent);
 }
 
-.review-detail .review-header { justify-content: flex-start; }
+.review-detail .review-header { justify-content: flex-start; flex-wrap: wrap; }
+.review-header .btn { margin-inline-start: auto; }
 
 .review-layout {
   display: grid;

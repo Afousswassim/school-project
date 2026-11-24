@@ -21,7 +21,7 @@ async function session(http, email, password = 'password') {
 }
 
 async function login(page, email, password = 'password') {
-  await page.goto(frontend + '/login')
+  if (!page.url().startsWith(frontend + '/')) await page.goto(frontend + '/login')
   await page.getByLabel('Email', { exact: true }).fill(email)
   await page.getByLabel('Password', { exact: true }).fill(password)
   await page.getByRole('button', { name: 'Sign in', exact: true }).click()
@@ -30,7 +30,7 @@ async function login(page, email, password = 'password') {
 
 async function prepareReport(http, teacher, admin, studentId, name, validate = true) {
   const reportText = 'Rapport fictif de vérification du réexamen (' + name + ' ' + marker + ').'
-  const originalType = 'Démo réexamen ' + name + ' ' + marker
+  const originalType = 'Retard répété'
   const payload = { student_id: studentId, report_text: reportText }
   const analysis = await data(await http.post(api + base + '/analyze', { headers: teacher, data: payload, timeout: 150000 }))
   const id = analysis.analysis_id
@@ -40,7 +40,7 @@ async function prepareReport(http, teacher, admin, studentId, name, validate = t
   const original = validate ? await data(await http.post(api + base + '/review/' + id, {
     headers: admin, data: { severity: 2, incident_type: originalType },
   })) : null
-  return { id, originalType, original }
+  return { id, originalType, original, reportText, reference: original?.reference }
 }
 
 function cleanup() {
@@ -50,22 +50,25 @@ function cleanup() {
     input: 'DELETE FROM discipline_reports WHERE ' + filter + ';\nSELECT ROW_COUNT();\n',
     encoding: 'utf8',
   })
+  if (result.error) throw result.error
   assert.equal(result.status, 0, result.stderr)
   assert.equal(Number(result.stdout.trim()), records.length)
   console.log('Rapports fictifs et demandes associées retirés.')
 }
 
-function row(page, type) {
-  return page.getByRole('row').filter({ has: page.getByRole('cell', { name: type, exact: true }) })
+function row(page, reference) {
+  return page.getByRole('row').filter({ has: page.getByRole('rowheader', { name: reference, exact: true }) })
 }
 
 async function submitRequest(page, fixture, reason, checkEmpty) {
-  const entry = row(page, fixture.originalType)
+  const entry = row(page, fixture.reference)
   await entry.getByRole('button', { name: 'Demander un réexamen', exact: true }).click()
-  const dialog = page.getByRole('dialog', { name: 'Demander un réexamen' })
+  const dialog = page.getByRole('dialog', { name: 'Demander un réexamen ' + fixture.reference, exact: true })
   const input = dialog.getByLabel('Motif de la demande')
   const submit = dialog.getByRole('button', { name: 'Envoyer la demande' })
+  await dialog.getByText(fixture.reportText, { exact: true }).waitFor()
   assert.ok(await dialog.getByText(fixture.originalType, { exact: true }).isVisible())
+  assert.ok(await dialog.getByText('Modéré', { exact: true }).isVisible())
   assert.ok(await dialog.locator('time').isVisible())
   if (checkEmpty) {
     await submit.click()
@@ -86,7 +89,7 @@ async function submitRequest(page, fixture, reason, checkEmpty) {
 }
 
 async function resolve(page, fixture, reason, reply, revise) {
-  const button = page.getByRole('button', { name: 'Ouvrir le rapport ' + fixture.id, exact: true })
+  const button = page.getByRole('button', { name: 'Ouvrir le rapport ' + fixture.reference, exact: true })
   await button.locator('xpath=ancestor::tr').getByText('Réexamen en attente', { exact: true }).waitFor()
   await button.click()
   const panel = page.getByRole('region', { name: 'Demande de réexamen' })
@@ -115,8 +118,8 @@ async function resolve(page, fixture, reason, reply, revise) {
   await page.getByRole('button', { name: 'Retour à la liste' }).click()
 }
 
-async function checkReply(page, type, status, reply, severity) {
-  const entry = row(page, type)
+async function checkReply(page, reference, status, reply, severity) {
+  const entry = row(page, reference)
   await entry.getByText(status, { exact: true }).waitFor()
   assert.ok(await entry.getByText(severity, { exact: true }).isVisible())
   await entry.getByRole('button', { name: 'Voir la réponse' }).click()
@@ -138,6 +141,7 @@ async function main() {
     const revised = await prepareReport(http, teacher, admin, profile.profile_id, 'révision')
     const race = await prepareReport(http, teacher, admin, profile.profile_id, 'concurrence', false)
     const requestPath = (id) => base + '/mine/' + id + '/reconsideration'
+    const detailPath = (id) => api + base + '/mine/' + id
     const resolvePath = (id) => base + '/review/' + id + '/reconsideration'
     const post = async (path, headers, payload) => http.post(api + path, { headers, data: payload })
     await data(await post(requestPath(upheld.id), student, { reason: '  \n' }), 422)
@@ -146,30 +150,58 @@ async function main() {
     await data(await post(resolvePath(upheld.id), student, { outcome: 'upheld', response: 'Accès refusé' }), 403)
     await data(await post(resolvePath(upheld.id), teacher, { outcome: 'upheld', response: 'Accès refusé' }), 403)
     await data(await post(requestPath(upheld.id), admin, { reason: 'Accès refusé' }), 403)
+    const list = await data(await http.get(api + base + '/mine', { headers: student }))
+    assert.notEqual(upheld.reference, revised.reference)
+    for (const fixture of [upheld, revised]) {
+      const { id, reference, reportText } = fixture
+      assert.match(reference, new RegExp('^RD-\\d{4}-' + String(id).padStart(4, '0') + '$'))
+      const summary = list.find((entry) => entry.id === id)
+      assert.equal(summary.reference, reference)
+      assert.ok(!('report_text' in summary))
+      const detail = await data(await http.get(detailPath(id), { headers: student }))
+      assert.equal(detail.reference, reference)
+      assert.equal(detail.report_text, reportText)
+      assert.equal(detail.teacher_name, fixture.original.teacher_name)
+      for (const privateField of ['predictions', 'reviewer_name', 'student_name']) assert.ok(!(privateField in detail))
+    }
+    await data(await http.get(detailPath(upheld.id), { headers: other }), 404)
+    await data(await http.get(detailPath(race.id), { headers: student }), 404)
+    await data(await http.get(detailPath(upheld.id), { headers: teacher }), 403)
+    await data(await http.get(detailPath(upheld.id)), 401)
 
-    const desktop = await browser.newPage({ viewport: { width: 1440, height: 960 } })
-    const mobile = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true })
-    const adminPage = await browser.newPage({ viewport: { width: 1440, height: 960 } })
-    const adminMobile = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true })
-    await login(desktop, 'student@school.test')
-    await login(mobile, 'student@school.test')
-    await login(adminPage, 'admin@school.test', adminPassword)
-    await login(adminMobile, 'admin@school.test', adminPassword)
-    const studentUrl = frontend + '/my-discipline-reports'
-    await desktop.goto(studentUrl)
-    await mobile.goto(studentUrl)
-    await mobile.getByRole('button', { name: 'Use dark mode' }).click()
-    await mobile.getByRole('columnheader', { name: 'Réexamen' }).waitFor()
-    assert.equal(await mobile.locator('html').getAttribute('data-bs-theme'), 'dark')
-    assert.equal(await mobile.getByRole('region', { name: 'Liste des rapports' }).evaluate((el) => el.scrollWidth === el.clientWidth), true)
+    const desktop = { width: 1440, height: 960 }
+    const mobile = { width: 390, height: 844 }
+    const page = await browser.newPage({ viewport: desktop })
+    await login(page, 'student@school.test')
+    const studentReports = page.getByRole('link', { name: 'Mes rapports disciplinaires', exact: true })
+    await studentReports.click()
+    for (const [viewport, fixture] of [[desktop, upheld], [mobile, revised]]) {
+      await page.setViewportSize(viewport)
+      if (viewport === mobile) {
+        await page.getByRole('button', { name: 'Use dark mode' }).click()
+        assert.equal(await page.locator('html').getAttribute('data-bs-theme'), 'dark')
+        assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), await page.evaluate(() => innerWidth))
+      }
+      await row(page, fixture.reference).getByRole('button', { name: 'Voir les détails', exact: true }).click()
+      const details = page.getByRole('dialog', { name: 'Détails du rapport ' + fixture.reference, exact: true })
+      await details.getByText(fixture.reportText, { exact: true }).waitFor()
+      await details.getByText(fixture.original.teacher_name, { exact: true }).waitFor()
+      await details.getByRole('button', { name: 'Fermer', exact: true }).click()
+    }
 
     const maintainReason = 'Je souhaite préciser le déroulement de l’incident.'
     const revisionReason = 'L’heure relevée dans le rapport doit être corrigée.'
     const maintainReply = 'Les éléments vérifiés confirment la décision initiale.'
     const revisionReply = 'Le contexte a été vérifié et la gravité a été corrigée.'
     const revisedType = 'Retard corrigé ' + marker
-    await submitRequest(desktop, upheld, maintainReason, true)
-    await submitRequest(mobile, revised, revisionReason, false)
+    await page.setViewportSize(desktop)
+    await page.getByRole('button', { name: 'Use light mode' }).click()
+    await submitRequest(page, upheld, maintainReason, true)
+    const untouched = await data(await http.get(detailPath(revised.id), { headers: student }))
+    assert.equal(untouched.reconsideration, null)
+    await page.setViewportSize(mobile)
+    await page.getByRole('button', { name: 'Use dark mode' }).click()
+    await submitRequest(page, revised, revisionReason, false)
     await data(await post(requestPath(upheld.id), student, { reason: 'Deuxième demande' }), 409)
     await data(await post(resolvePath(upheld.id), admin, { outcome: 'upheld', response: ' ' }), 422)
     await data(await post(resolvePath(revised.id), admin, { outcome: 'revised', response: 'Gravité invalide', severity: 4 }), 422)
@@ -178,11 +210,13 @@ async function main() {
     assert.equal(pending.finalized_severity, 2)
     assert.equal(pending.reconsideration.status, 'pending')
 
-    await adminPage.goto(frontend + '/discipline-reports/review')
-    await resolve(adminPage, upheld, maintainReason, maintainReply, null)
-    await adminMobile.goto(frontend + '/discipline-reports/review')
-    await adminMobile.getByRole('button', { name: 'Use dark mode' }).click()
-    await resolve(adminMobile, revised, revisionReason, revisionReply, revisedType)
+    await page.setViewportSize(desktop)
+    await page.getByRole('button', { name: 'Logout', exact: true }).click()
+    await login(page, 'admin@school.test', adminPassword)
+    await page.getByRole('link', { name: 'Rapports disciplinaires', exact: true }).click()
+    await resolve(page, upheld, maintainReason, maintainReply, null)
+    await page.setViewportSize(mobile)
+    await resolve(page, revised, revisionReason, revisionReply, revisedType)
     await data(await post(resolvePath(revised.id), admin, { outcome: 'upheld', response: 'Deuxième traitement' }), 409)
     await data(await post(requestPath(revised.id), student, { reason: 'Réouverture' }), 409)
 
@@ -201,10 +235,13 @@ async function main() {
     }
     const otherReports = await data(await http.get(api + base + '/mine', { headers: other }))
     assert.ok(!otherReports.some(({ id }) => id === revised.id || id === upheld.id))
-    await desktop.reload()
-    await mobile.reload()
-    await checkReply(desktop, upheld.originalType, 'Décision maintenue', maintainReply, 'Modéré')
-    await checkReply(mobile, revisedType, 'Décision révisée', revisionReply, 'Mineur')
+    await page.setViewportSize(desktop)
+    await page.getByRole('button', { name: 'Logout', exact: true }).click()
+    await login(page, 'student@school.test')
+    await studentReports.click()
+    await checkReply(page, upheld.reference, 'Décision maintenue', maintainReply, 'Modéré')
+    await page.setViewportSize(mobile)
+    await checkReply(page, revised.reference, 'Décision révisée', revisionReply, 'Mineur')
 
     await data(await post(base + '/review/' + race.id, admin, { severity: 2, incident_type: race.originalType }))
     const parallel = await Promise.all(['Premier motif', 'Second motif'].map((reason) => post(requestPath(race.id), student, { reason })))
@@ -216,10 +253,10 @@ async function main() {
     console.log('API. Motif et réponse vides, gravité invalide, rapport non validé, accès hors périmètre et concurrence au dépôt et au traitement.')
   } finally {
     try {
-      cleanup()
-    } finally {
       await http.dispose()
       await browser.close()
+    } finally {
+      cleanup()
     }
   }
 }
